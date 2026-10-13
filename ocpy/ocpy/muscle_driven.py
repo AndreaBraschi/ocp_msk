@@ -804,7 +804,7 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
     # register function as parallel form across the number of segments of
     # the trajectory.
     parallel_mode = "thread"
-    num_threads   = 8
+    num_threads   = cfg['optimiser']['num_threads']
     f_coll_map = f_coll.map(N, parallel_mode, num_threads)
 
     # evaluate

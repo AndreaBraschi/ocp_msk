@@ -1,3 +1,4 @@
+import os
 import json
 import pickle
 import numpy as np
@@ -6,7 +7,7 @@ import casadi as ca
 import opensim as osim
 from typing import Optional, List
 from osim_utils.read import readStoFile
-
+import matplotlib.pyplot as plt
 # ----------- local imports ---------- #
 from .collocation.schemes import radau
 from .getters import *
@@ -17,7 +18,7 @@ from .guess import *
 
 
 from .casadi_functions import torque_activation_dynamics_casadi, generate_hill_equilibrium_func
-from .casadi_functions import sum_of_squares, compute_joint_moment, build_muscle_function
+from .casadi_functions import sum_of_squares, compute_joint_moment, build_muscle_poly
 from .casadi_functions.apply_constraints import apply_constraints
 
 from .opt import solve_NLP
@@ -493,7 +494,7 @@ def muscle_driven(model_path: str, ik_path: str, dll_path: str, config_filepath:
     dfT_j_nsc = dfT_j * muscle_scaling['mtu_df']
     va_k_nsc = va_k * muscle_scaling['va']
 
-    fT_kj_unit = fT_kj * MT_params[0, :]
+    fT_kj_unit = fT_kj_nsc * MT_params[0, :]
 
     # ---------------------- CasADi functions -------------------------- #
     # Cost-function: sum of squares
@@ -545,7 +546,7 @@ def muscle_driven(model_path: str, ik_path: str, dll_path: str, config_filepath:
     hill_equilibrium_func = generate_hill_equilibrium_func(num_muscles, MT_params)
 
     # muscle polynomial function
-    muscle_poly = build_muscle_function(muscle_pkl)
+    muscle_poly = build_muscle_poly(muscle_pkl)
 
     # path constraints over the net moments of the joints that are spanned by muscles
     # for this, we need to build a dictionary with individual CasADi functions, one per joint.
@@ -781,8 +782,8 @@ def muscle_driven(model_path: str, ik_path: str, dll_path: str, config_filepath:
         # ------------------------------------------------------------------------------------------------------------ #
         t_act = 0.015
         t_deact = 0.06
-        act1 = va_k + a_mj[:, i] / (np.ones((num_muscles, 1)) * t_deact)
-        act2 = va_k + a_mk / (np.ones((num_muscles, 1)) * t_act)
+        act1 = va_k_nsc + a_mj[:, i] / (np.ones((num_muscles, 1)) * t_deact)
+        act2 = va_k_nsc + a_mk / (np.ones((num_muscles, 1)) * t_act)
 
         ineq_constr1.append(act1)
         ineq_constr2.append(act2)
@@ -811,6 +812,8 @@ def muscle_driven(model_path: str, ik_path: str, dll_path: str, config_filepath:
 
     #  add constraints to opti struct
     opti.subject_to(eq_constr_all == 0)
+    opti.subject_to(ineq_constr1_all[:] >= 0)
+    opti.subject_to(ineq_constr2_all[:] <= (1 / t_act))
 
     lbg = np.array(ca.evalf(opti.lbg)).flatten()
     ubg = np.array(ca.evalf(opti.ubg)).flatten()
@@ -886,16 +889,25 @@ def muscle_driven(model_path: str, ik_path: str, dll_path: str, config_filepath:
     return w_opt, stats, g_opt, lambda_x, lambda_g
 
 if __name__ == "__main__":
+    trial_id = "P05R0002"
     model_path = r"C:\Users\ab3758\Documents\PhD\msk\P5\scaled_model_rot.osim"
-    ik_path = r"C:\Users\ab3758\Documents\PhD\msk\P5\ik\P05R0002_ik_rot.mot"
-    dll_path = r'C:\Users\ab3758\Documents\projects\tackling_msk\ocp\dlls\P05\build\RelWithDebInfo\P05.dll'
-    config_filepath = r"C:\Users\ab3758\Documents\projects\tackling_msk\ocp\configs\tackling/config_rot.json"
-    kinematic_coupling_path = r"C:\Users\ab3758\Documents\projects\tackling_msk\ocp\configs\tackling\kinematic_coupling_config.json"
+    ik_path = fr"C:\Users\ab3758\Documents\PhD\msk\P5\ik\{trial_id}_ik_rot.mot"
+    dll_path = r'C:\Users\ab3758\Documents\projects\ocp_msk\dlls\P05\build\RelWithDebInfo\P05.dll'
+    config_filepath = r"C:\Users\ab3758\Documents\projects\ocp_msk\configs\tackling\config_rot.json"
+    kinematic_coupling_path = r"C:\Users\ab3758\Documents\projects\ocp_msk\configs\tackling\kinematic_coupling_config.json"
 
     output_dir = r"C:\Users\ab3758\Documents\PhD\msk\P5\opt\py"
-    grf_path = r"C:\Users\ab3758\Documents\PhD\msk\P5\grf\P05R0002.mot"
+    grf_path = fr"C:\Users\ab3758\Documents\PhD\msk\P5\grf\{trial_id}.mot"
 
-    muscle_info_path = r"C:\Users\ab3758\Downloads\muscle_data_reduced.pkl"
+    muscle_info_path = r"C:\Users\ab3758\Documents\projects\ocp_msk\assets\muscle_poly_info.pkl"
 
-    muscle_driven(model_path, ik_path, dll_path, config_filepath, kinematic_coupling_path,output_dir, muscle_info_path,
+    w_opt, stats, g_opt, lambda_x, lambda_g = muscle_driven(model_path, ik_path, dll_path, config_filepath, kinematic_coupling_path,output_dir, muscle_info_path,
                   grf_path)
+
+    output_dir = os.path.join(output_dir, trial_id)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    output_filepath = os.path.join(output_dir, "muscle_solution.pkl")
+    with open(output_filepath, "wb") as f:
+        pickle.dump(dict(w_opt=w_opt, stats=stats, g_opt=g_opt,
+                         lambda_x=lambda_x, lambda_g=lambda_g), f, protocol=4)

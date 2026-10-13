@@ -23,7 +23,7 @@ from .casadi_functions.apply_constraints import apply_constraints
 
 from .opt import solve_NLP
 
-def muscle_driven(model_path: str, ik_path: str, dll_path: str, config_filepath: str, kinematic_coupling_path: str,
+def run(model_path: str, ik_path: str, external_func_path: str, config_filepath: str, kinematic_coupling_path: str,
                       output_dir: str, muscle_info_path: str, grf_path: Optional[str] = None):
 
 
@@ -37,7 +37,7 @@ def muscle_driven(model_path: str, ik_path: str, dll_path: str, config_filepath:
         muscle_pkl = pickle.load(f)
 
     #------------ load external function (rigid body dynamics) ----------- #
-    F = ca.external('F', dll_path)
+    F = ca.external('F', external_func_path)
     dll_force_idx = cfg["dll_force_indices"]
     dll_grf_idx = np.array(dll_force_idx["rGRF"] + dll_force_idx["lGRF"]) - 1  # 0-based
 
@@ -886,28 +886,9 @@ def muscle_driven(model_path: str, ik_path: str, dll_path: str, config_filepath:
     # Solve problem
     w_opt, stats, g_opt, lambda_x, lambda_g = solve_NLP(opti, options)
 
-    return w_opt, stats, g_opt, lambda_x, lambda_g
-
-if __name__ == "__main__":
-    trial_id = "P05R0002"
-    model_path = r"C:\Users\ab3758\Documents\PhD\msk\P5\scaled_model_rot.osim"
-    ik_path = fr"C:\Users\ab3758\Documents\PhD\msk\P5\ik\{trial_id}_ik_rot.mot"
-    dll_path = r'C:\Users\ab3758\Documents\projects\ocp_msk\dlls\P05\build\RelWithDebInfo\P05.dll'
-    config_filepath = r"C:\Users\ab3758\Documents\projects\ocp_msk\configs\tackling\config_rot.json"
-    kinematic_coupling_path = r"C:\Users\ab3758\Documents\projects\ocp_msk\configs\tackling\kinematic_coupling_config.json"
-
-    output_dir = r"C:\Users\ab3758\Documents\PhD\msk\P5\opt\py"
-    grf_path = fr"C:\Users\ab3758\Documents\PhD\msk\P5\grf\{trial_id}.mot"
-
-    muscle_info_path = r"C:\Users\ab3758\Documents\projects\ocp_msk\assets\muscle_poly_info.pkl"
-
-    w_opt, stats, g_opt, lambda_x, lambda_g = muscle_driven(model_path, ik_path, dll_path, config_filepath, kinematic_coupling_path,output_dir, muscle_info_path,
-                  grf_path)
-
-    output_dir = os.path.join(output_dir, trial_id)
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
     output_filepath = os.path.join(output_dir, "muscle_solution.pkl")
     with open(output_filepath, "wb") as f:
         pickle.dump(dict(w_opt=w_opt, stats=stats, g_opt=g_opt,
                          lambda_x=lambda_x, lambda_g=lambda_g), f, protocol=4)
+
+    return w_opt, stats, g_opt, lambda_x, lambda_g

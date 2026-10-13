@@ -85,4 +85,4 @@ def solve_NLP(opti, optionssol):
     lambda_g = np.array(ca.DM.full(sol['lam_g'])).flatten()
     lambda_x = np.array(ca.DM.full(sol['lam_x'])).flatten()
 
-    return w_opt, stats, g_opt, lambda_g, lambda_x, solver
+    return w_opt, stats, g_opt, lambda_g, lambda_x

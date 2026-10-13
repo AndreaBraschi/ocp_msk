@@ -24,10 +24,14 @@ classifiers = [
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering",
 ]
-
 dependencies = [
     "opensim",
     "casadi",
     "scipy",
     "osim_utils @ git+https://github.com/AndreaBraschi/osim_utils.git@master"
 ]
+
+[project.scripts]
+ocpy = "ocpy.cli:main"
+
+

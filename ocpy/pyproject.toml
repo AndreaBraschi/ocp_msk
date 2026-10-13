@@ -28,6 +28,7 @@ dependencies = [
     "opensim",
     "casadi",
     "scipy",
+    "c3d",
     "osim_utils @ git+https://github.com/AndreaBraschi/osim_utils.git@master"
 ]
 

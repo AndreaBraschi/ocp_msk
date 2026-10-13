@@ -15,7 +15,7 @@ import numpy as np
 from .mvpoly_sym import mvpoly_sym
 
 
-def build_muscle_function(muscle_pkl) -> ca.Function:
+def build_muscle_poly(muscle_pkl) -> ca.Function:
 
     # which joints are spanned by which muscle
     muscle_spanning = muscle_pkl['spanning']

@@ -208,7 +208,7 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
     num_muscle_dofs = len(muscle_dof_names)
 
     # find the indices of these DoFs wrt to the global index set of the generalised coordinates
-    muscle_dof_indices = np.array([i for i, name in enumerate(q_names) if name in muscle_dof_names])
+    muscle_dof_indices = np.array([q_names.index(name) for name in muscle_dof_names])
 
 
     # ----------- Torque Actuators -------------- #
@@ -714,7 +714,7 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
         # to the parametrised rate of change of the activation, which was registered in the control set of the
         # problem (implicit formulation).
         va_approx = a_mkj @ C[:, i + 1]  # [num_muscles, d + 1] @ [d+1, 1] -> [num_muscles, 1]
-        eq_constr.append((mesh_T * va_k_nsc - va_approx) / muscle_scaling['va'])
+        eq_constr.append(mesh_T * va_k_nsc - va_approx)
 
 
 
@@ -830,8 +830,8 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
     # --------------------------------------------------------------------------------------------------------------- #
     # because in direct collocation we treat each discrete point of the trajectory as a variable to optimise, we must
     # constrain how IPOPT can place these points in the y-axis. There is a significant risk of discontinuity in between
-    # segments. Therefore, we must ensure that the segments along the trajectory are continous and the way to do it is
-    # to impose as a constraint that the last point of a segment must be equal to the first point of its subsquent one.
+    # segments. Therefore, we must ensure that the segments along the trajectory are continuous and the way to do it is
+    # to impose as a constraint that the last point of a segment must be equal to the first point of its subsequent one.
 
     q_end = X[::2, :]
     q_col = X_col[::2, :]

@@ -204,11 +204,11 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
     MT_params = get_mt_parameters(model, muscle_names)
 
 
-    muscle_dof_names: List[str] = cfg["dof_names_spanned_by_muscles"]
-    num_muscle_dofs = len(muscle_dof_names)
+    dof_no_act_names: List[str] = cfg["dof_names_spanned_by_muscles"]
+    num_dofs_no_act = len(dof_no_act_names)
 
     # find the indices of these DoFs wrt to the global index set of the generalised coordinates
-    muscle_dof_indices = np.array([q_names.index(name) for name in muscle_dof_names])
+    dof_no_act_indices = np.array([q_names.index(name) for name in dof_no_act_names])
 
 
     # ----------- Torque Actuators -------------- #
@@ -216,7 +216,7 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
     # we define one actuator per independent DoF here we check which coordinates the user has indicated as where to
     # assign the residual forces. We need to make sure that we correctly separate the residual forces from the actuator
     # forces/torques so that we can assign them to the correct set of constraints.
-    exclude = set(res_indices) | set(no_tracking_indices) | set(muscle_dof_indices)
+    exclude = set(res_indices) | set(no_tracking_indices) | set(dof_no_act_indices)
     actuator_indices = [i for i in q_ind_indices if i not in exclude]
     actuator_names = [name for i, name in enumerate(q_names) if i in actuator_indices]
     num_actuators = len(actuator_indices)
@@ -552,6 +552,18 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
     # for this, we need to build a dictionary with individual CasADi functions, one per joint.
     # 1) which joints are spanned by which muscles
     muscle_spanning = muscle_pkl['spanning']
+    muscle_dof_names = muscle_pkl['dof_names']
+    muscle_dof_indices = np.array([q_names.index(name) for name in muscle_dof_names])
+    num_muscle_dofs = len(muscle_dof_indices)
+
+    # now we need to understand how many DoFs have their net moment as the result of the effect of muscles and idealised
+    # torque actuators
+    dofs_shared_names = [name for name in muscle_dof_names if name not in dof_no_act_names]
+    dofs_shared_indices = [i for i, name in enumerate(actuator_names) if name in dofs_shared_names]
+
+    # update actuator indices
+    actuator_indices = np.array([actuator_indices[i] for i, name in enumerate(actuator_names) if name not in dofs_shared_names]).tolist()
+    actuator_indices_l = np.array([actuator_names.index(name) for name in actuator_names if name not in dofs_shared_names]).tolist()
 
     # build CasADi functions
     T_muscle_func = {}
@@ -724,8 +736,8 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
         # Computed torque from CasADi should be equal to the net moments
         # coming out of the OpenSim model. We do this only for the DoFs
         # that aren't spanned by the muscles.
-        Ti_torques = Ti[actuator_indices, 0] / actuator_sf
-        eq_constr.append(Ti_torques - a_akj[:, i + 1])
+        Ti_torques = Ti[actuator_indices, 0] / actuator_sf[actuator_indices_l, :]
+        eq_constr.append(Ti_torques - a_akj[actuator_indices_l, i + 1])
 
         # Also, we want to make sure that everything is dynamically consistent and therefore, we want to make sure that
         # the residuals computed from the current kinematics is below the threshold that the user defined.
@@ -775,7 +787,12 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
             dof_tau = T_func(dM_n, forces)
 
             # add to equality constraint set
-            eq_constr.append((Ti[dof_idx, 0] - dof_tau) / joint_moment_sf)
+            if not dof_name in dofs_shared_names:
+                eq_constr.append((Ti[dof_idx, 0] - dof_tau) / joint_moment_sf)
+            else:
+                index = dofs_shared_names.index(dof_name)
+                eq_constr.append((Ti[dof_idx, 0] - dof_tau) / joint_moment_sf + a_akj[dofs_shared_indices[index], i + 1])
+
 
         # ------------------------------------------------------------------------------------------------------------ #
         #                                            Inequality constraints                                            #
@@ -884,11 +901,28 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
 
     # --------------------------------------------------------------- #
     # Solve problem
-    w_opt, stats, g_opt, lambda_x, lambda_g = solve_NLP(opti, options)
+    w_opt, stats, g_opt, lambda_g, lambda_x = solve_NLP(opti, options)
 
     output_filepath = os.path.join(output_dir, "muscle_solution.pkl")
     with open(output_filepath, "wb") as f:
         pickle.dump(dict(w_opt=w_opt, stats=stats, g_opt=g_opt,
                          lambda_x=lambda_x, lambda_g=lambda_g), f, protocol=4)
 
-    return w_opt, stats, g_opt, lambda_x, lambda_g
+    return w_opt, stats, g_opt, lambda_g, lambda_x
+
+
+if __name__ == "__main__":
+    trial_id = "P05R0002"
+    model_path = r"C:\Users\ab3758\Documents\PhD\msk\P5\scaled_model_rot.osim"
+    ik_path = fr"C:\Users\ab3758\Documents\PhD\msk\P5\ik\{trial_id}\{trial_id}_ik.mot"
+    dll_path = r'C:\Users\ab3758\Documents\projects\ocp_msk\dlls\P05\build\RelWithDebInfo\P05.dll'
+    config_filepath = r"C:\Users\ab3758\Documents\projects\ocp_msk\configs\tackling\config_rot.json"
+    kinematic_coupling_path = r"C:\Users\ab3758\Documents\projects\ocp_msk\configs\tackling\kinematic_coupling_config.json"
+
+    output_dir = r"C:\Users\ab3758\Documents\PhD\msk\P5\opt\py"
+    grf_path = fr"C:\Users\ab3758\Documents\PhD\msk\P5\grf\{trial_id}.mot"
+
+    muscle_info_path = r"C:\Users\ab3758\Documents\projects\ocp_msk\assets\P05\muscle_info_reduced.pkl"
+
+    w_opt, stats, g_opt, lambda_g, lambda_x = run(model_path, ik_path, dll_path, config_filepath, kinematic_coupling_path,output_dir, muscle_info_path,
+                  grf_path)

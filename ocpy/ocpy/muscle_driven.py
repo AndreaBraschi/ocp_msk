@@ -909,20 +909,3 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
                          lambda_x=lambda_x, lambda_g=lambda_g), f, protocol=4)
 
     return w_opt, stats, g_opt, lambda_g, lambda_x
-
-
-if __name__ == "__main__":
-    trial_id = "P05R0002"
-    model_path = r"C:\Users\ab3758\Documents\PhD\msk\P5\scaled_model_rot.osim"
-    ik_path = fr"C:\Users\ab3758\Documents\PhD\msk\P5\ik\{trial_id}\{trial_id}_ik.mot"
-    dll_path = r'C:\Users\ab3758\Documents\projects\ocp_msk\dlls\P05\build\RelWithDebInfo\P05.dll'
-    config_filepath = r"C:\Users\ab3758\Documents\projects\ocp_msk\configs\tackling\config_rot.json"
-    kinematic_coupling_path = r"C:\Users\ab3758\Documents\projects\ocp_msk\configs\tackling\kinematic_coupling_config.json"
-
-    output_dir = r"C:\Users\ab3758\Documents\PhD\msk\P5\opt\py"
-    grf_path = fr"C:\Users\ab3758\Documents\PhD\msk\P5\grf\{trial_id}.mot"
-
-    muscle_info_path = r"C:\Users\ab3758\Documents\projects\ocp_msk\assets\P05\muscle_info_reduced.pkl"
-
-    w_opt, stats, g_opt, lambda_g, lambda_x = run(model_path, ik_path, dll_path, config_filepath, kinematic_coupling_path,output_dir, muscle_info_path,
-                  grf_path)

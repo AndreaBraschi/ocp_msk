@@ -242,6 +242,11 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
     special_q_bounds = cfg["bounds"]["special_qs"]
     x_bounds, x_scaling = set_x_bounds(Qs, time_raw, q_ind_indices, num_q_all, special_q_bounds)
 
+    scaling_filepath = os.path.join(output_dir, "scaling.pkl")
+    with open(scaling_filepath, "wb") as f:
+        pickle.dump(dict(q_scaling=x_scaling.Qs, qdot_scaling=x_scaling.Qsdot, acc_scaling=x_scaling.Qsdotdot),
+                     f, protocol=4)
+
     # ----------- torque actuators ----------- #
     torque_bounds, torque_scaling = set_torque_bounds(num_actuators)
 
@@ -909,3 +914,21 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
                          lambda_x=lambda_x, lambda_g=lambda_g), f, protocol=4)
 
     return w_opt, stats, g_opt, lambda_g, lambda_x
+
+if __name__ == "__main__":
+    subject_id = "P08"
+    trial_id = "L4501"
+    trial = f"{subject_id}{trial_id}"
+    model_path = fr"C:\Users\ab3758\Documents\PhD\msk\{subject_id}\scaled_model_rot.osim"
+    ik_path = fr"C:\Users\ab3758\Documents\PhD\msk\{subject_id}\ik\{trial}\{trial}_ik.mot"
+    dll_path = fr'C:\Users\ab3758\Documents\projects\ocp_msk\dlls\{subject_id}\build\RelWithDebInfo\{subject_id}_l.dll'
+    config_filepath = r"C:\Users\ab3758\Documents\projects\ocp_msk\configs\tackling\config_rot.json"
+    kinematic_coupling_path = r"C:\Users\ab3758\Documents\projects\ocp_msk\configs\tackling\kinematic_coupling_config.json"
+
+    output_dir = fr"C:\Users\ab3758\Documents\projects\tackling\msk_modelling\ocp\outputs\{subject_id}\{trial_id}"
+    grf_path = fr"C:\Users\ab3758\Documents\PhD\msk\{subject_id}\grf\{trial}.mot"
+
+    muscle_info_path = r"C:\Users\ab3758\Documents\projects\ocp_msk\assets\P05\muscle_info_reduced.pkl"
+
+    w_opt, stats, g_opt, lambda_g, lambda_x = run(model_path, ik_path, dll_path, config_filepath, kinematic_coupling_path,output_dir, muscle_info_path,
+                  grf_path)

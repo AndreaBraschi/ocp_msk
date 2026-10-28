@@ -405,7 +405,28 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
 
         func_map_in.append(residual_vars[key])
 
+    # -------------------- Parameters ------------------------- #
+    if cfg['params']:
+        param_keys = cfg['params'].keys()
+        param_dict = {}
+        
+        # read bounds
+        param_bounds, param_scaling = set_param_bounds(cfg)
 
+        for key in list(param_keys):
+
+            values = residuals[key]
+            param_size: int = param_keys[key]['size']
+            param_guess = param_keys[key]['guess']
+            
+            param_dict[key] = opti.variable(param_size, 1)
+            opti.subject_to(param_bounds[key]['lower'] <= (param_dict[key] <= param_bounds[key]['upper']))
+            
+            opti.set_initial(param_dict[key], param_guess * np.ones((param_size, 1)))
+
+            func_map_in.append(param_dict[key])
+    
+    
     print(f"Decision variables: {opti.nx}")
     print(f"Bound constraints : {opti.ng}")
 
@@ -484,6 +505,17 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
         res_sym[key] = ca.MX.sym(f"{key}_j", var_size, d)
         func_in.append(res_sym[key])
 
+    
+    # ------------ Parameters ------------ #
+    if cfg['params']:
+        param_keys = cfg['params'].keys()
+        param_sym = {}
+        for key in list(param_keys):
+
+            param_size: int = param_keys[key]['size']
+            param_sym[key] = ca.MX.sym(f"{key}_sym", param_size, 1)
+            func_in.append(param_sym[key])
+
 
     # Unscale X: we unscale the generalised coordinates, speeds and accelerations to use them in the external function
     # tpo compute the system inverse dynamics.
@@ -500,6 +532,15 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
     va_k_nsc = va_k * muscle_scaling['va']
 
     fT_kj_unit = fT_kj_nsc * MT_params[0, :]
+
+    # unscale params
+    if cfg['params']:
+        param_keys = cfg['params'].keys()
+        num_params = len(param_keys)
+        params_nsc = ca.MX.zeros(num_params, 1)
+        
+        for n_p, key in enumerate(list(param_keys)):
+            params_nsc[n_p, :] = param_sym[key] * param_scaling[key]
 
     # ---------------------- CasADi functions -------------------------- #
     # Cost-function: sum of squares
@@ -629,7 +670,12 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
         x_all_i, acc_all_i = apply_constraints(x_i, acc_i, q_names, q_ind_indices, path_to_config=kinematic_coupling_path)
 
         # evaluate external function: rigid body dynamics
-        Ti = F(ca.vertcat(x_all_i, acc_all_i))
+        if cfg['params']:
+            Ti = F(ca.vertcat(x_all_i, acc_all_i, params_nsc))
+        else:
+            Ti = F(ca.vertcat(x_all_i, acc_all_i))
+
+        
 
         # ------------------- Cost Function Terms ------------------- #
         # ---------- q ----------- #

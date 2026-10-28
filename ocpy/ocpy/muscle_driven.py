@@ -418,7 +418,7 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
         for key in list(param_keys):
 
             param_size: int = cfg['params'][key]['size']
-            param_guess = cfg['params'][key]['guess']
+            param_guess = cfg['params'][key]['guess'] / param_scaling[key]
             
             param_dict[key] = opti.variable(param_size, 1)
             opti.subject_to(param_bounds[key]['lower'] <= (param_dict[key] <= param_bounds[key]['upper']))

@@ -7,7 +7,7 @@ import casadi as ca
 import opensim as osim
 from typing import Optional, List
 from osim_utils.read import readStoFile
-import matplotlib.pyplot as plt
+
 # ----------- local imports ---------- #
 from .collocation.schemes import radau
 from .getters import *

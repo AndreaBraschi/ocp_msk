@@ -25,5 +25,5 @@ def sum_of_squares(var_name: str, D: int) -> ca.Function:
         CasADi Function named 'J_<var_name>' that maps var → scalar J.
     """
     var = ca.SX.sym(var_name, D)
-    J = ca.sum1(var**2)
+    J = ca.sum1(var ** 2)
     return ca.Function(f"J_{var_name}", [var], [J])

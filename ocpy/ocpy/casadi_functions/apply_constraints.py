@@ -14,8 +14,8 @@ import casadi as ca
 import sys, os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from kinematic_coupling.linear import linear
-from kinematic_coupling.cubic  import cubic
+from ..kinematic_coupling.linear import linear
+from ..kinematic_coupling.cubic  import cubic
 
 
 def apply_constraints(
@@ -23,7 +23,7 @@ def apply_constraints(
     acc,                        # ca.MX, accelerations of independent coords
     q_all_list: list[str],      # names of ALL coordinates (independent + dependent)
     independent_indices,        # integer array / list of independent coord indices (0-based)
-    path_to_config: str | Path = "kinematic_coupling/config.json",
+    path_to_config: str | Path,
 ):
     """
     Apply kinematic constraints and return the full interleaved state vector.
@@ -65,9 +65,9 @@ def apply_constraints(
 
     # Fill independent coordinates first
     ind = list(independent_indices)
-    q_all[ind]     = q
-    q_dot_all[ind] = q_dot
-    acc_all[ind]   = acc
+    q_all[ind, :] = q
+    q_dot_all[ind, :] = q_dot
+    acc_all[ind, :] = acc
 
     # Apply constraints for each coupling
     for constraint_name, cfg in config.items():
@@ -79,9 +79,9 @@ def apply_constraints(
         dep_idx = q_all_list.index(dep_name)
         ind_idx = q_all_list.index(ind_name)
 
-        pos = q_all[ind_idx]
-        vel = q_dot_all[ind_idx]
-        acc_in = acc_all[ind_idx]
+        pos = q_all[ind_idx, :]
+        vel = q_dot_all[ind_idx, :]
+        acc_in = acc_all[ind_idx, :]
 
         if coupling == "linear":
             a, b = coeffs[0], coeffs[1]

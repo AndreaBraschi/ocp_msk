@@ -4,5 +4,8 @@ from . import (
     getters,
     kinematic_coupling,
     dynamics_constraints,
-    utils
+    utils,
+    muscle_driven,
+    numerical_functions,
+    evaluation
 )

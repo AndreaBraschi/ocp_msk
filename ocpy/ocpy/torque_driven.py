@@ -702,3 +702,14 @@ def torque_driven(model_path: str, ik_path: str, dll_path: str, config_filepath:
 
     return w_opt, stats, g_opt, lambda_x, lambda_g
 
+if __name__ == "__main__":
+    model_path = r"C:\Users\ab3758\Documents\PhD\msk\P5\scaled_model_rot.osim"
+    ik_path = r"C:\Users\ab3758\Documents\PhD\msk\P5\ik\P05R0002_ik_rot.mot"
+    dll_path = r'C:\Users\ab3758\Documents\projects\tackling_msk\ocp\dlls\P05\build\RelWithDebInfo\P05.dll'
+    config_filepath = r"C:\Users\ab3758\Documents\projects\tackling_msk\ocp\configs\tackling/config.json"
+    kinematic_coupling_path = r"C:\Users\ab3758\Documents\projects\tackling_msk\ocp\configs\tackling\kinematic_coupling_config.json"
+
+    output_dir = r"C:\Users\ab3758\Documents\PhD\msk\P5\opt\py"
+    grf_path = r"C:\Users\ab3758\Documents\PhD\msk\P5\grf\P05R0002.mot"
+
+    torque_driven(model_path, ik_path, dll_path, config_filepath, kinematic_coupling_path,output_dir, grf_path)

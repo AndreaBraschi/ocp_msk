@@ -1,6 +1,7 @@
-function evaluate_res(trial_id, trial_dir, dll_filepath)
+function evaluate_res(trial_id, trial_dir, model_name, ik_name, dll_filepath, bodykin_dll, ...
+    bushing_dll)
 
-    load checkpoint.mat w_opt stats;
+    load solution_300.mat w_opt stats;
     load scaling.mat scaling;
     load guess.mat guess;
 
@@ -53,15 +54,22 @@ function evaluate_res(trial_id, trial_dir, dll_filepath)
     [tau_root, C, D, B] = collocationScheme(d, method); % collocation scheme.
 
     
-    % Load external functions
+    % ----------- Load external functions ---------- %
+    % main: get GRFs and Collision Force
     F = external('F', dll_filepath); 
     % load information relevant to external function from config file
     dll_force_indices = config_struct.("dll_force_indices");
     dll_grf_indices = [dll_force_indices.rGRF', dll_force_indices.lGRF'];
     dll_grm_indices = [dll_force_indices.rGRM', dll_force_indices.lGRM'];
 
+    % body kinematics
+    F_kinematics = external('F', bodykin_dll); 
+
+    % body kinematics
+    F_bushing = external('F', bushing_dll); 
+
     % -------------------------- OpenSim Model -------------------------- % 
-    model_filepath = fullfile(trial_dir, "/scaled_model.osim");
+    model_filepath = fullfile(trial_dir, model_name);
     model = Model(model_filepath);
 
      % ---------- sets ----------- %
@@ -72,8 +80,6 @@ function evaluate_res(trial_id, trial_dir, dll_filepath)
     
     % ---------- info ----------- %
     q_names = getItemNames(coordinateSet);
-    muscle_names = getItemNames(muscleSet);
-    MTparameters = getMTparameters(model, muscle_names);
 
     % generic parameters
     num_body_dof = 6;  % the number of theoretical DoFs that a rigid body has
@@ -93,7 +99,7 @@ function evaluate_res(trial_id, trial_dir, dll_filepath)
 
     
     % ------ IK ------ %
-    ik_filepath = fullfile(trial_dir, "/ik/", trial_id + "_ik.mot");
+    ik_filepath = fullfile(trial_dir, "/ik/", ik_name);
     Qs = readMotQs(ik_filepath, 15);
     Qs.allfilt(:, pelvis_y_idx + 1) = Qs.allfilt(:, pelvis_y_idx + 1) + ...
         Qs.allfilt(:, pelvis_y_idx + 1) * pelvis_y;
@@ -220,7 +226,6 @@ function evaluate_res(trial_id, trial_dir, dll_filepath)
     GRM_scaled = (GRM_col./scaling.GRM)';
 
     
-
     % --------------- Retrieve q's -------------------- %
     % collocation points
     dims = 2 * num_q_ind;
@@ -242,57 +247,57 @@ function evaluate_res(trial_id, trial_dir, dll_filepath)
 
 
     % --------------- Retrieve muscle activation -------------------- %
-    dims = num_muscles;
-    
-    % collocation points
-    points = d * N;
-    a_col = zeros(dims, points);
-    for n = 1:points
-       a_col(:, n) = w_opt(u:u + dims - 1, :);
-       u = u + dims;
-    end
-
-
-    % 2) mesh end-points
-    points = N + 1;
-    a = zeros(dims, points);
-    for n = 1:points
-       a(:, n) = w_opt(u:u + dims - 1, :);
-       u = u + dims;
-    end
-
+    % dims = num_muscles;
+    % 
+    % % collocation points
+    % points = d * N;
+    % a_col = zeros(dims, points);
+    % for n = 1:points
+    %    a_col(:, n) = w_opt(u:u + dims - 1, :);
+    %    u = u + dims;
+    % end
+    % 
+    % 
+    % % 2) mesh end-points
+    % points = N + 1;
+    % a = zeros(dims, points);
+    % for n = 1:points
+    %    a(:, n) = w_opt(u:u + dims - 1, :);
+    %    u = u + dims;
+    % end
+    % 
     % --------------- Retrieve MT force -------------------- %
-    dims = num_muscles;
-    
-    % 1) collocation points
-    points = d * N;
-    FTtilde_col = zeros(dims, points);
-    for n = 1:points
-       FTtilde_col(:, n) = w_opt(u:u + dims - 1, :);
-       u = u + dims;
-    end
-
-    % 2) mesh end-points
-    points = N + 1;
-    FTtilde = zeros(dims, points);
-    for n = 1:points
-       FTtilde(:, n) = w_opt(u:u + dims - 1, :);
-       u = u + dims;
-    end
+    % dims = num_muscles;
+    % 
+    % % 1) collocation points
+    % points = d * N;
+    % FTtilde_col = zeros(dims, points);
+    % for n = 1:points
+    %    FTtilde_col(:, n) = w_opt(u:u + dims - 1, :);
+    %    u = u + dims;
+    % end
+    % 
+    % % 2) mesh end-points
+    % points = N + 1;
+    % FTtilde = zeros(dims, points);
+    % for n = 1:points
+    %    FTtilde(:, n) = w_opt(u:u + dims - 1, :);
+    %    u = u + dims;
+    % end
 
 
     % --------------------- Retrieve torque actuators ---------------------- %
     dims = num_actuators;
     points = d * N;
-    
+
     % 1) collocation points
     a_a_col = zeros(dims, points);
     for n = 1:points
        a_a_col(:, n) = w_opt(u:u + dims - 1, :);
        u = u + dims;
     end
-    
-    
+
+
     % 2) mesh end-points
     points = N + 1;
     a_a = zeros(dims, points);
@@ -304,17 +309,17 @@ function evaluate_res(trial_id, trial_dir, dll_filepath)
 
 
     % --------------------- Retrieve muscle vA ------------------------ %
-    dims = num_muscles;
-    points = N + 1;
-    
-    % end points
-    vA = zeros(dims, points);
-    for n = 1:points
-       vA(:, n) = w_opt(u:u + dims - 1, :);
-       u = u + dims;
-    end
+    % dims = num_muscles;
+    % points = N + 1;
+    % 
+    % % end points
+    % vA = zeros(dims, points);
+    % for n = 1:points
+    %    vA(:, n) = w_opt(u:u + dims - 1, :);
+    %    u = u + dims;
+    % end
 
-    
+
     % ------------------ Retrieve actuator excitation ------------------- %
     dims = num_actuators;
     e_a = zeros(dims, points);
@@ -326,14 +331,14 @@ function evaluate_res(trial_id, trial_dir, dll_filepath)
 
 
     % ---------------- Retrieve MT force time derivative ---------------- %
-    dims = num_muscles;
-    points = d * N;
-    dFTtilde_col = zeros(dims, points);
-    for n = 1:points
-       dFTtilde_col(:, n) = w_opt(u:u + dims - 1, :);
-       u = u + dims;
-    end
-    
+    % dims = num_muscles;
+    % points = d * N;
+    % dFTtilde_col = zeros(dims, points);
+    % for n = 1:points
+    %    dFTtilde_col(:, n) = w_opt(u:u + dims - 1, :);
+    %    u = u + dims;
+    % end
+
     
     % ------------------- Retrieve accelerations ------------------- %
     dims = num_q_ind;
@@ -346,7 +351,7 @@ function evaluate_res(trial_id, trial_dir, dll_filepath)
     
     
     
-    % ----------------------- Retrieve residuals  ----------------------- %
+    % % ----------------------- Retrieve residuals  ----------------------- %
     % pelvis
     dims = num_body_dof;
     points = d * N;
@@ -355,8 +360,8 @@ function evaluate_res(trial_id, trial_dir, dll_filepath)
        pelvis_res_col(:, n) = w_opt(u:u + dims - 1, :);
        u = u + dims;
     end
-    
-    
+
+
     % punching bag
     dims = 3;
     pb_res_col = zeros(dims, d * N);
@@ -369,37 +374,39 @@ function evaluate_res(trial_id, trial_dir, dll_filepath)
     % we need to make use of the unscaled version of the data
     X_nsc = zeros(size(X_col));
     X_nsc(1:2:end, :) = X_col(1:2:end,:).*scaling.Qs(:, q_ind_indices)';
+    q_unscaled = zeros(d * N, num_q_all);
+    qdot_unscaled = zeros(d * N, num_q_all);
     X_nsc(2:2:end, :) = X_col(2:2:end,:).*scaling.Qsdot(:, q_ind_indices)';
 
 
     % plot kinematics
-    interleaved = reshape(repmat(q_ind_names, 2, 1), 1, []);
-    for index = 1:size(interleaved, 2)
-
-        figure('Visible', 'off');
-        plot(time_grid, X_col(index, :), 'b-', 'LineWidth', 1.5, 'DisplayName', 'IPOPT');
-        hold on;
-        plot(time_grid, guess.Qs_col_ind(:, index), 'r--', 'LineWidth', 1.5, 'DisplayName', 'Experimental');
-        hold off;
-
-        xlabel('Time (s)');
-        ylabel('Coordinate value');
-
-        if mod(index, 2) ~= 0
-            label = interleaved{index};
-        else
-            label = [interleaved{index} 'Vel'];
-        end
-
-        title(label);
-
-
-        legend('show');
-        grid on;
-
-        saveas(gcf, sprintf('C:/Users/ab3758/Documents/PhD/msk/ocp/figures/qs/adjusted_pelvis_ty/coord_%02d_%s.png', index, interleaved{index}));
-        close(gcf);
-    end
+    % interleaved = reshape(repmat(q_ind_names, 2, 1), 1, []);
+    % for index = 1:size(interleaved, 2)
+    % 
+    %     figure('Visible', 'off');
+    %     plot(time_grid, X_col(index, :), 'b-', 'LineWidth', 1.5, 'DisplayName', 'IPOPT');
+    %     hold on;
+    %     plot(time_grid, guess.Qs_col_ind(:, index), 'r--', 'LineWidth', 1.5, 'DisplayName', 'Initial Guess');
+    %     hold off;
+    % 
+    %     xlabel('Time (s)');
+    %     ylabel('Coordinate value');
+    % 
+    %     if mod(index, 2) ~= 0
+    %         label = interleaved{index};
+    %     else
+    %         label = [interleaved{index} 'Vel'];
+    %     end
+    % 
+    %     title(label);
+    % 
+    % 
+    %     legend('show');
+    %     grid on;
+    % 
+    %     saveas(gcf, sprintf('C:/Users/ab3758/Documents/PhD/msk/ocp/figures/qs/adjusted_pelvis_ty/coord_%02d_%s.png', index, interleaved{index}));
+    %     close(gcf);
+    % end
 
     A_nsc = A_col.*(scaling.Qsdotdot(:, q_ind_indices)');  
    
@@ -407,6 +414,29 @@ function evaluate_res(trial_id, trial_dir, dll_filepath)
     num_grfs = 6;
     GRFs = zeros(num_grfs, d * N);
     GRMs = zeros(num_grfs, d * N);
+    pelvis_residuals = zeros(num_q_all, d * N);
+    collision_force = zeros(3, d * N);
+    clav_force = zeros(3, d * N);
+    humerus_force = zeros(3, d * N);
+    humerus_x = zeros(8, d * N);
+    humerus_xdot = zeros(8, d * N);
+    humerus_n = zeros(8, d * N);
+    scalar_force = zeros(1, d * N);
+    indentation = zeros(1, d * N);
+
+    % BodyKinematics pre-allocation
+    rCalcaneus = zeros(3, d * N);
+    lCalcaneus = zeros(3, d * N);
+    rTibia = zeros(3, d * N);
+    rFemur = zeros(3, d * N);
+
+    % Bushing forces pre-allocation
+    spine = zeros(3, d * N);
+    c7 = zeros(3, d * N);
+    c6 = zeros(3, d * N);
+    c5 = zeros(3, d * N);
+    c4 = zeros(3, d * N);
+    c3 = zeros(3, d * N);
         
     % Read the weights of the cost function from config file
     W = config_struct.("W");
@@ -439,13 +469,47 @@ function evaluate_res(trial_id, trial_dir, dll_filepath)
 
         [x_all_i, acc_all_i] = apply_constraints(x_i, acc_i, q_names, q_ind_indices);
 
+        q_unscaled(i, :) = x_all_i(1:2:end, :)';
+        qdot_unscaled(i, :) = x_all_i(2:2:end, :)';
+
         % evaluate external function
         Ti = F(vertcat(x_all_i, acc_all_i));
         GRFs(:, i) = full(Ti(num_q_all + dll_grf_indices, 1));
         GRMs(:, i) = full(Ti(num_q_all + dll_grm_indices, 1));
+        pelvis_residuals(:, i) = full(Ti(1:num_q_all, 1));
+        collision_force(:, i) = full(Ti(end-34:end-32, 1));
+        clav_force(:, i) = full(Ti(end-31:end-29, 1));
+        humerus_force(:, i) = full(Ti(end-28:end-26, 1));
+        humerus_x(:, i) = full(Ti(end-25:end-18, 1));
+        humerus_xdot(:, i) = full(Ti(end-17:end-10, 1));
+        humerus_n(:, i) = full(Ti(end-9:end-2, 1));
+        scalar_force(:, i) = full(Ti(end-1, 1));
+        indentation(:, i) = full(Ti(end, 1));
+
+        % collision_force(:, i) = scalar_force(:, i) * unit_vec(:, i);
+        % clav_force(:, i) = -scalar_force(:, i) * unit_vec(:, i);
+
+        % evaluate BodyKinematics
+        coms = F_kinematics(vertcat(x_all_i, acc_all_i));
+
+        rCalcaneus(:, i) = full(coms(1:3, 1));
+        lCalcaneus(:, i) = full(coms(4:6, 1));
+        rTibia(:, i) = full(coms(7:9, 1));
+        rFemur(:, i) = full(coms(10:12, 1));
+
+        % evaluate Bushing forces
+        b_forces = F_bushing(vertcat(x_all_i, acc_all_i));
+
+        spine(:, i) = full(b_forces(1:3, 1));
+        c7(:, i) = full(b_forces(4:6, 1));
+        c6(:, i) = full(b_forces(7:9, 1));
+        c5(:, i) = full(b_forces(10:12, 1));
+        c4(:, i) = full(b_forces(13:15, 1));
+        c3(:, i) = full(b_forces(16:18, 1));
 
 
-        % ---------------- Cost Function Terms ---------------- %
+
+        % % ---------------- Cost Function Terms ---------------- %
         % Q
         % let's remove the c-spine translational DoFs from the experimental 
         % motion tracking terms
@@ -467,34 +531,152 @@ function evaluate_res(trial_id, trial_dir, dll_filepath)
         Ti_GRM_scaled = GRMs(:, i)./scaling.GRM';
         GRM_diff = Ti_GRM_scaled - GRM_scaled(:, i);
         GRM_term(i, :) = W.GRM * B(u + 1) * sum(GRM_diff.^2) * mesh_T;
-
-        % muscle activation
-        act_term(i, :) = W.a * B(u + 1) * (sum(a_col(:, i).^2)) * mesh_T;
-
-        % muscle activation time derivative
-        act_der_term(i, :) = W.vA * B(u + 1) * sum(vA(:).^2) * mesh_T;
-
+        % 
+        % % muscle activation
+        % act_term(i, :) = W.a * B(u + 1) * (sum(a_col(:, i).^2)) * mesh_T;
+        % 
+        % % muscle activation time derivative
+        % act_der_term(i, :) = W.vA * B(u + 1) * sum(vA(:).^2) * mesh_T;
+        % 
         % Q dot dot: Accelerations
         q_dot_dot_term(i, :) = W.acc * B(u + 1) * sum(A_col(:, i).^2) * mesh_T;
-
-        % derivative of MT force
-        dMTf_dt_term(i, :) = W.u * B(u + 1) * sum(dFTtilde_col(:, i).^2) * mesh_T;
-
+        % 
+        % % derivative of MT force
+        % dMTf_dt_term(i, :) = W.u * B(u + 1) * sum(dFTtilde_col(:, i).^2) * mesh_T;
+        % 
         % pelvis residual term
         pelvis_term(i, :) = W.pelvis * B(u + 1) * sum(pelvis_res_col(:, i).^2) * mesh_T;
-
+        % 
         % punching bag residual term
         pb_term(i, :) = W.pelvis * B(u + 1) * sum(pb_res_col(:, i).^2) * mesh_T;
-
+        % 
         if mod(i, 3) == 0
            u = 1;
         else
            u = u + 1;
         end
-        
+        % 
            
     end
     
+    figure();
+    plot(time_grid, humerus_n(3, :), 'b-', 'LineWidth', 1.5, 'DisplayName', 'third');
+    % hold on;
+    % plot(time_grid, humerus_n(4, :), 'r--', 'LineWidth', 1.5, 'DisplayName', 'fourth');
+    % plot(time_grid, humerus_n(5, :), 'k--', 'LineWidth', 1.5, 'DisplayName', 'fifth');
+    % hold off;
+
+    xlabel('Time (s)');
+    ylabel('Direction');
+
+    legend('show');
+    grid on;
+
+    figure();
+    plot(time_grid, humerus_x(3, :), 'b-', 'LineWidth', 1.5, 'DisplayName', 'third');
+    % hold on;
+    % plot(time_grid, humerus_n(4, :), 'r--', 'LineWidth', 1.5, 'DisplayName', 'fourth');
+    % plot(time_grid, humerus_n(5, :), 'k--', 'LineWidth', 1.5, 'DisplayName', 'fifth');
+    % hold off;
+
+    xlabel('Time (s)');
+    ylabel('Direction');
+
+    legend('show');
+    grid on;
+
+    figure();
+    plot(time_grid, collision_force(1, :), 'b-', 'LineWidth', 1.5, 'DisplayName', 'cylinder');
+    hold on;
+    plot(time_grid, pelvis_residuals(end-2, :), 'r--', 'LineWidth', 1.5, 'DisplayName', 'pb residuals');
+    plot(time_grid, humerus_force(1, :), 'k--', 'LineWidth', 1.5, 'DisplayName', 'humerus');
+    hold off;
+
+    xlabel('Time (s)');
+    ylabel('Force (N)');
+
+    legend('show');
+    grid on;
+
+    figure();
+    plot(time_grid, collision_force(1, :), 'b-', 'LineWidth', 1.5, 'DisplayName', 'cylinder');
+    hold on;
+    plot(time_grid, pelvis_residuals(end-2, :), 'r--', 'LineWidth', 1.5, 'DisplayName', 'pb residuals');
+    hold off;
+
+    xlabel('Time (s)');
+    ylabel('Force (N)');
+
+    legend('show');
+    grid on;
+
+    figure();
+    plot(time_grid, scalar_force(1, :), 'b-', 'LineWidth', 1.5, 'DisplayName', 'scalar force');
+    hold on;
+    plot(time_grid, pelvis_residuals(end-2, :), 'k--', 'LineWidth', 1.5, 'DisplayName', 'pb residuals');
+    hold off;
+    xlabel('Time (s)');
+    ylabel('Force (N)');
+
+    legend('show');
+    grid on;
+
+    % plot GRFs
+    % Right AP
+    figure();
+    plot(time_grid, GRFs(1, :), 'b-', 'LineWidth', 1.5, 'DisplayName', 'IPOPT');
+    hold on;
+    plot(time_grid, GRF_col(:, 1), 'r--', 'LineWidth', 1.5, 'DisplayName', 'Initial Guess');
+    hold off;
+
+    xlabel('Time (s)');
+    ylabel('Force (N)');
+
+
+    legend('show');
+    grid on;
+
+    % % Right Vertical
+    figure();
+    plot(time_grid, GRFs(2, :), 'b-', 'LineWidth', 1.5, 'DisplayName', 'IPOPT');
+    hold on;
+    plot(time_grid, GRF_col(:, 2), 'r--', 'LineWidth', 1.5, 'DisplayName', 'Initial Guess');
+    hold off;
+
+    xlabel('Time (s)');
+    ylabel('Force (N)');
+
+
+    legend('show');
+    grid on;
+
+    % Left AP
+    figure();
+    plot(time_grid, GRFs(4, :), 'b-', 'LineWidth', 1.5, 'DisplayName', 'IPOPT');
+    hold on;
+    plot(time_grid, GRF_col(:, 4), 'r--', 'LineWidth', 1.5, 'DisplayName', 'Initial Guess');
+    hold off;
+
+    xlabel('Time (s)');
+    ylabel('Force (N)');
+
+
+    legend('show');
+    grid on;
+
+    % Left Vertical
+    figure();
+    plot(time_grid, GRFs(5, :), 'b-', 'LineWidth', 1.5, 'DisplayName', 'IPOPT');
+    hold on;
+    plot(time_grid, GRF_col(:, 5), 'r--', 'LineWidth', 1.5, 'DisplayName', 'Initial Guess');
+    hold off;
+
+    xlabel('Time (s)');
+    ylabel('Force (N)');
+
+
+    legend('show');
+    grid on;
 
     J = sum(q_term) + sum(q_dot_term) + sum(GRF_term) + sum(GRM_term) + ...
         sum(act_term) + sum(act_der_term) + sum(q_dot_dot_term) + ...
@@ -537,7 +719,9 @@ function evaluate_res(trial_id, trial_dir, dll_filepath)
     grid on;
     saveas(gcf, sprintf('C:/Users/ab3758/Documents/PhD/msk/ocp/figures/qs/adjusted_pelvis_ty/cost_function_histogram.png'));
     close(gcf);
-        
+    
+
+    x = 5;
 
 end
 

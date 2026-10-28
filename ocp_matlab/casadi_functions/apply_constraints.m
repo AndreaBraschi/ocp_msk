@@ -1,4 +1,5 @@
-function [x_all, acc_all] = apply_constraints(x, acc, q_all_list, independent_indices)
+function [x_all, acc_all] = apply_constraints(x, acc, q_all_list, ...
+    independent_indices, kinematic_coupling_path)
 
 % This function applies the registered kinematic constraints in the
 % config.json file. Furthermore, it outputs the new complete set of q,
@@ -17,11 +18,8 @@ function [x_all, acc_all] = apply_constraints(x, acc, q_all_list, independent_in
 
 import casadi.*
 
-% add kinematic coupling functions
-path_to_config = fullfile("kinematic_coupling", "config.json");
-
 % read config file
-json_str = fileread(path_to_config);
+json_str = fileread(kinematic_coupling_path);
 config_struct = jsondecode(json_str);
 
 q = x(1:2:end);
@@ -82,7 +80,7 @@ for i = 1:num_constraints
     q_all(dependent_coord_idx_all, :) = value.pos;
     q_dot_all(dependent_coord_idx_all, :) = value.vel;
     acc_all(dependent_coord_idx_all, :) = value.acc;
-    fprintf('\n');
+    % fprintf('\n');
 
 end
 

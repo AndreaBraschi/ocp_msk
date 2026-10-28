@@ -238,7 +238,7 @@ bounds.pelvis_res.lower = (bounds.pelvis_res.lower)./scaling.pelvis_res;
 bounds.pelvis_res.upper = (bounds.pelvis_res.upper)./scaling.pelvis_res;
 
 
-pb_sf = scale_factors.("punching_bag");
+pb_sf = scale_factors.("pb_rot");
 bounds.pb_res.lower = -pb_sf * ones(1, 3);
 bounds.pb_res.upper =  pb_sf * ones(1, 3);
 

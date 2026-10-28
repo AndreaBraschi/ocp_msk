@@ -226,15 +226,17 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
 
     # let's check whether the user has provided some actuators to be given a specific scale factor
     act_special_sf = cfg["actuator_scale_factors"]["special"]
-    act_keys = act_special_sf.keys()
-    for i, key in enumerate(list(act_keys)):
-        items = act_special_sf[key]
 
-        act_special_values = items["magnitude"]
-        act_special_names = items["names"]
+    if act_special_sf:
+        act_keys = act_special_sf.keys()
+        for i, key in enumerate(list(act_keys)):
+            items = act_special_sf[key]
 
-        act_special_indices = [i for i, name in enumerate(actuator_names) if name in act_special_names]
-        actuator_sf[act_special_indices] = act_special_values
+            act_special_values = items["magnitude"]
+            act_special_names = items["names"]
+
+            act_special_indices = [i for i, name in enumerate(actuator_names) if name in act_special_names]
+            actuator_sf[act_special_indices] = act_special_values
 
 
     # -------------------------------------- Bounds ------------------------------------------------------- #
@@ -415,9 +417,8 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
 
         for key in list(param_keys):
 
-            values = residuals[key]
-            param_size: int = param_keys[key]['size']
-            param_guess = param_keys[key]['guess']
+            param_size: int = cfg['params'][key]['size']
+            param_guess = cfg['params'][key]['guess']
             
             param_dict[key] = opti.variable(param_size, 1)
             opti.subject_to(param_bounds[key]['lower'] <= (param_dict[key] <= param_bounds[key]['upper']))
@@ -512,7 +513,7 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
         param_sym = {}
         for key in list(param_keys):
 
-            param_size: int = param_keys[key]['size']
+            param_size: int = cfg['params'][key]['size']
             param_sym[key] = ca.MX.sym(f"{key}_sym", param_size, 1)
             func_in.append(param_sym[key])
 
@@ -962,12 +963,12 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
     return w_opt, stats, g_opt, lambda_g, lambda_x
 
 if __name__ == "__main__":
-    subject_id = "P08"
-    trial_id = "L4501"
+    subject_id = "P10"
+    trial_id = "R0001"
     trial = f"{subject_id}{trial_id}"
     model_path = fr"C:\Users\ab3758\Documents\PhD\msk\{subject_id}\scaled_model_rot.osim"
     ik_path = fr"C:\Users\ab3758\Documents\PhD\msk\{subject_id}\ik\{trial}\{trial}_ik.mot"
-    dll_path = fr'C:\Users\ab3758\Documents\projects\ocp_msk\dlls\{subject_id}\build\RelWithDebInfo\{subject_id}_l.dll'
+    dll_path = fr'C:\Users\ab3758\Documents\projects\ocp_msk\dlls\{subject_id}\build\RelWithDebInfo\{subject_id}_r.dll'
     config_filepath = r"C:\Users\ab3758\Documents\projects\ocp_msk\configs\tackling\config_rot.json"
     kinematic_coupling_path = r"C:\Users\ab3758\Documents\projects\ocp_msk\configs\tackling\kinematic_coupling_config.json"
 

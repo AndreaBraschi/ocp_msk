@@ -1,5 +1,5 @@
 function guess = getGuess(Qs, independent_coord_idx, time_mesh, time_col, ...
-    num_q, num_muscles, num_actuators, scaling, pelvis_y_idx, scaling_factor)
+    num_q, num_muscles, num_actuators, scaling)
 % --------------------------------------------------------------------------
 % getGuess
 %   This function creates an inital guess for the design variables directly

@@ -1,6 +1,6 @@
 function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = torque_driven( ...
     model_path, ik_path, dll_path, config_filepath, kinematic_coupling_path, ...
-    output_dir, grf_path ... 
+    output_dir, grf_path, acc_path ... 
     )
 
 % -------------------------------------------------------------------------
@@ -25,7 +25,8 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = torque_driven( ...
         config_filepath
         kinematic_coupling_path
         output_dir
-        grf_path = []   % default to empty if not passed
+        grf_path = []% default to empty if not passed
+        acc_path = []
     end        
 
     import casadi.*
@@ -158,6 +159,8 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = torque_driven( ...
         indices_to_track = setdiff(tracking_indices, special_indices_ind);
     else
         indices_to_track = tracking_indices;
+        num_special_indices = 0;
+        special_indices_ind = local_tracking_indices;
 
     end
 
@@ -185,7 +188,7 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = torque_driven( ...
 
     
     % ------ IK ------ %
-    Qs = readMotQs(ik_path, 15);
+    Qs = readMotQs(ik_path, 6);
     % Qs.allfilt(:, pelvis_y_idx + 1) = Qs.allfilt(:, pelvis_y_idx + 1) + ...
     %     Qs.allfilt(:, pelvis_y_idx + 1) * pelvis_y_sf;
 
@@ -222,17 +225,20 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = torque_driven( ...
     % let's check whether the user has provided some actuators to be given
     % a specific scale factor
     act_special_sf = scale_factors.special;
-    act_keys      = fieldnames(act_special_sf);
-    for i = 1:length(act_keys)
-        key   = act_keys{i};
-        items = act_special_sf.(key);        
-
-        act_special_value = items.magnitude;
-        act_special_names = items.names;
-        
-        act_special_indices = cellfun(@(name) find(strcmp(actuator_names, name)), act_special_names);
-        actuator_sf(act_special_indices, :) = act_special_value;
+    if ~isempty(act_special_sf)
+        act_keys      = fieldnames(act_special_sf);
+        for i = 1:length(act_keys)
+            key   = act_keys{i};
+            items = act_special_sf.(key);        
+    
+            act_special_value = items.magnitude;
+            act_special_names = items.names;
+            
+            act_special_indices = cellfun(@(name) find(strcmp(actuator_names, name)), act_special_names);
+            actuator_sf(act_special_indices, :) = act_special_value;
+        end
     end
+
 
 
     % see if the user provided any GRF
@@ -278,6 +284,62 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = torque_driven( ...
     special_qs = config_struct.bounds.special_qs;
     [x_bounds, x_scaling] = set_xBounds(Qs, q_ind_indices, num_q_all, special_qs);
 
+    if ~isempty(acc_path)
+        acc_raw = read_mot_acc(acc_path);
+        acc_headers = acc_raw.colheaders(:, 2:end);
+        % interpolate acc at the collocation points
+        acc_col = interp1(Qs.time, acc_raw.allfilt(:, 2:end), time_grid');
+
+        % get indices of the coordinates
+        acc_indices = cellfun(@(name) find(strcmp(q_names, name)), acc_headers);
+
+        % re-set bounds and scaling for these
+        x_bounds.Qsdotdot.upper(:, acc_indices) = max(acc_col);
+        x_bounds.Qsdotdot.lower(:, acc_indices) = min(acc_col);
+
+        x_scaling.Qsdotdot(:, acc_indices) = max(abs(x_bounds.Qsdotdot.lower(:, acc_indices)),...
+            abs(x_bounds.Qsdotdot.upper(:, acc_indices)));
+        x_bounds.Qsdotdot.lower(:, acc_indices) = (x_bounds.Qsdotdot.lower(:, acc_indices))./x_scaling.Qsdotdot(:, acc_indices);
+        x_bounds.Qsdotdot.upper(:, acc_indices) = (x_bounds.Qsdotdot.upper(:, acc_indices))./x_scaling.Qsdotdot(:, acc_indices);
+
+        x_bounds.Qsdotdot.lower_ind = x_bounds.Qsdotdot.lower(:, q_ind_indices');
+        x_bounds.Qsdotdot.upper_ind = x_bounds.Qsdotdot.upper(:, q_ind_indices');
+
+    end
+    
+    % average velocity setup
+    x_bounds_lower = repmat(x_bounds.X.lower, N + 1, 1);
+    x_bounds_lower_col = repmat(x_bounds.X.lower, N * d, 1);
+
+    x_bounds_upper = repmat(x_bounds.X.upper, N + 1, 1);
+    x_bounds_upper_col = repmat(x_bounds.X.upper, N * d, 1);
+
+    % assign pelvis tx
+    x_bounds_lower(1, 7) = 0;
+    x_bounds_lower_col(1, 7) = 0;
+
+    x_bounds_upper(1, 7) = 0;
+    x_bounds_upper_col(1, 7) = 0;
+
+    % assign pelvis ty
+    x_bounds_lower(:, 9) = 0.8 / 1.05;
+    x_bounds_lower_col(:, 9) = 0.8 / 1.05;
+
+    x_bounds_upper(:, 9) = 1.05 / 1.05;
+    x_bounds_upper_col(:, 9) = 1.05 / 1.05;
+
+    % assign pelvis tz
+    x_bounds_lower(:, 11) = -0.1 / 0.1;
+    x_bounds_lower_col(:, 11) = -0.1 / 0.1;
+
+    x_bounds_upper(:, 11) = 0.1 / 0.1;
+    x_bounds_upper_col(:, 11) = 0.1 / 0.1;
+
+    % change scaling for pelvis
+    x_scaling.Qs(:, 4) = 5;
+    x_scaling.Qs(:, 5) = 1.05;
+    x_scaling.Qs(:, 6) = 0.1;
+
     % ---------- actuators ----------- %
     [act_bounds, act_scaling] = set_torqueBounds(num_actuators);
     
@@ -295,6 +357,19 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = torque_driven( ...
     torque_guess = torqueGuess(num_actuators, time_intervals, time_grid);
     x_guess = xGuess(Qs, q_ind_indices, time_intervals, time_grid, ...
             num_q_all, x_scaling);
+
+    % average velocity setup
+    x_guess.Qs_all_ind(:, 9) = 0.98 / x_scaling.Qs(:, 5);
+    x_guess.Qs_col_ind(:, 9) = 0.98 / x_scaling.Qs(:, 5);
+
+
+    % same thing as the bounds for the acceleration
+    if ~isempty(acc_path)
+        x_guess.Qdotdots_col(:, acc_indices) = acc_col./x_scaling.Qsdotdot(:, acc_indices);
+        x_guess.Qdotdots_col_ind = x_guess.Qdotdots_col(:, q_ind_indices);
+
+    end
+    
     
 
     save(fullfile(output_dir, "guess.mat"), "x_guess", "torque_guess");
@@ -421,14 +496,14 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = torque_driven( ...
     X_col = opti.variable(dims, points);
     
     % bounds
-    opti.subject_to(x_bounds.X.lower' < X_col < x_bounds.X.upper');
+    opti.subject_to(x_bounds_lower_col' < X_col < x_bounds_upper_col');
     % initial condition
     opti.set_initial(X_col, x_guess.Qs_col_ind');
     
     % 2) mesh end-points
     points = N + 1;  
     X = opti.variable(dims, points);
-    opti.subject_to(x_bounds.X.lower' < X < x_bounds.X.upper');
+    opti.subject_to(x_bounds_lower' < X < x_bounds_upper');
     opti.set_initial(X, x_guess.Qs_all_ind');
 
 
@@ -494,6 +569,13 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = torque_driven( ...
         GRF_scaled = GRF_col./scaling_GRF;
 
         func_map_in{end+1} = MX(GRF_scaled');
+
+    end
+
+
+    if ~isempty(acc_path)
+        acc_track_scaled = x_guess.Qdotdots_col(:, acc_indices);
+        func_map_in{end+1} = MX(acc_track_scaled');
 
     end
     
@@ -581,6 +663,15 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = torque_driven( ...
         func_in{end+1} = GRF_track_j;
 
     end
+
+
+    if ~isempty(acc_path)
+        num_acc_track = size(acc_col, 2);
+        acc_track_j = MX.sym('acc_track_j', num_acc_track, d); 
+
+        func_in{end+1} = acc_track_j;
+
+    end
     
     
     % % ---------- Residuals ---------- %
@@ -650,6 +741,11 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = torque_driven( ...
         J_GRF = sum_of_squares('GRF', num_grfs);
     end
 
+    acc_track_term = MX.zeros(1, 1);
+    if ~isempty(acc_path)
+        J_acc_track = sum_of_squares('acc_track', size(acc_col, 2));
+    end
+
     
     
     for i = 1:length(res_keys)
@@ -712,6 +808,9 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = torque_driven( ...
         end
         
         q_new_indices = setdiff(local_tracking_indices, special_indices_ind)';
+        if isempty(q_new_indices)
+            q_new_indices = local_tracking_indices;
+        end
         q_diff = q_i(q_new_indices, :) - Qs_track_kj(indices_to_track, i + 1);
         q_term = q_term + W.q * B(i + 1) * J_q(q_diff) * mesh_T;
 
@@ -729,6 +828,12 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = torque_driven( ...
 
         % Q dot dot: Accelerations
         acc_term = acc_term + W.acc * B(i + 1) * J_acc(Aj(:, i)) * mesh_T;
+
+        % acceleration tracking term
+        if ~isempty(grf_path)
+            acc_diff = acc_track_j(:, i) - Aj(acc_indices, i);
+            acc_track_term = acc_track_term + W.acc_track * B(i + 1) * J_acc_track(acc_diff) * mesh_T;
+        end
 
 
         % GRF
@@ -753,7 +858,9 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = torque_driven( ...
                
         % ------------ add them up ----------- %
         J = q_term + q_special_term + q_dot_term + acc_term + q_no_tracking_term + ...
-            GRF_term + residuals_term;
+            GRF_term + residuals_term + acc_track_term;
+
+
         
         
         % --------------------------------------------------------------- %
@@ -881,9 +988,22 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = torque_driven( ...
         opti.subject_to(Qdot_mesh(:, k + 1) == qdot_kj * D);
         opti.subject_to(a_a(:, k + 1) == a_akj * D);
 
+        % if k == N
+        %     % add average speed constraint
+        %     T = time_opt(2) - time_opt(1);
+        %     avg_speed = 1.5;
+        %     q_kj_nsc = q_kj.*x_scaling.Qs(:, q_ind_indices)';
+        %     pelvis_tx_nsc = q_kj_nsc(4, :);
+        %     opti.subject_to(pelvis_tx_nsc * D == avg_speed * T);
+        % end
+
         % update collocation indices
         col_indices = col_indices + 3;
+
+
+
     end
+
 
     lbg = opti.value(opti.lbg);
     ubg = opti.value(opti.ubg);

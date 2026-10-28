@@ -6,17 +6,17 @@ def set_param_bounds(cfg) -> Dict[str, Dict[str, np.ndarray]]:
 
 
     bounds: Dict[str, Dict[str, np.ndarray]] = {}
-
+    scaling = {}
 
     params = cfg["params"]
-    keys = residuals.keys()
+    keys = params.keys()
 
     for i, key in enumerate(list(keys)):
         items = params[key]
 
-        param_lower: float = items[0][0]
-        param_upper: float = items[0][1]
-        param_size: float = items[0]
+        param_lower: float = items['bounds'][0]
+        param_upper: float = items['bounds'][1]
+        param_size: int = items['size']
 
         param_range = param_upper - param_lower
 

@@ -24,7 +24,7 @@ function GRF = readMotGrf(filepath, cutoff)
     if ~isempty(cutoff)
         order = 2;
         fs = 1 / mean(diff(GRF.data(:, 1)));
-        [a, b] = butter(order/2, cutoff./(0.5*fs), 'low');
+        [a, b] = butter(order, cutoff./(0.5*fs), 'low');
         GRF_filt = filtfilt(a, b, GRF.data(:, 2:end));
         GRF.data(:, 2:end) = GRF_filt;
         

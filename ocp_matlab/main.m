@@ -1,4 +1,5 @@
-function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = main(trial_id, trial_dir, model_name, ik_name, dll_filepath)
+function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = main(trial_id, trial_dir, model_name, ...
+    ik_name, dll_filepath, kinematic_coupling_path)
 
 % --------------------------------------------------------------------------
 % track_sim
@@ -124,7 +125,8 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = main(trial_id, trial_
     scale_factors = config_struct.("scale_factors");
     joint_moments_sf = scale_factors.("joint_moments");
     pelvis_res_sf = scale_factors.("pelvis_residuals");
-    pb_sf = scale_factors.("punching_bag");
+    pb_rot_sf = scale_factors.("pb_rot");
+    pb_lin_sf = scale_factors.("pb_linear");
     pelvis_y_sf = scale_factors.("pelvis_y");
 
     
@@ -259,6 +261,26 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = main(trial_id, trial_
         num_q_all, num_muscles, num_actuators, grf_indices, grm_indices, ...
         pelvis_y_idx, spine_t_indices, c_spine_t_bounds, scale_factors);
 
+    % repeat bound values over time points
+    lb_e_a = ones(N + 1, 1) * bounds.e_a.lower;
+    ub_e_a = ones(N + 1, 1) * bounds.e_a.upper;
+
+    lb_a_a = ones(N + 1, 1) * bounds.a_a.lower;
+    ub_a_a = ones(N + 1, 1) * bounds.a_a.upper;
+
+    lb_a_a_col = ones(N * d, 1) * bounds.a_a.lower;
+    ub_a_a_col = ones(N * d, 1) * bounds.a_a.upper;
+    
+    
+    % tighten up bounds around contact time
+    % lb_e_a(20:end, end-2:end) = -0.25;
+    % ub_e_a(20:end, end-2:end) = 0.25;
+
+    lb_a_a(:, end-2) = -1;
+    ub_a_a(:, end-2) = 0;
+
+    lb_a_a_col(:, end-2) = -1;
+    ub_a_a_col(:, end-2) = 0;
     
     % -------------------------- Initial Guess  ------------------------- %
     guess = getGuess(Qs, q_ind_indices, time_intervals, time_grid, ...
@@ -420,13 +442,13 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = main(trial_id, trial_
 
     % 1) collocation points
     a_a_col = opti.variable(dims, points);
-    opti.subject_to(bounds.a_a.lower'< a_a_col < bounds.a_a.upper');
+    opti.subject_to(lb_a_a_col'< a_a_col < ub_a_a_col');
     opti.set_initial(a_a_col, guess.a_a_col');
 
     % 2) mesh end-points
     points = N + 1;
     a_a = opti.variable(dims, points);
-    opti.subject_to(bounds.a_a.lower'< a_a < bounds.a_a.upper');
+    opti.subject_to(lb_a_a'< a_a < ub_a_a');
     opti.set_initial(a_a, guess.a_a');  
 
 
@@ -640,6 +662,9 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = main(trial_id, trial_
     % Punching bag rotational residuals
     J_pb = sum_of_squares('pb', 3);
 
+    % Punching bag linear residuals
+    % J_pb_lin = sum_of_squares('pb_lin', 3);
+
 
     % --- joint moments --- %
     % active elements
@@ -691,6 +716,7 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = main(trial_id, trial_
     dMTf_dt_term = MX.zeros(1, 1);
     pelvis_term = MX.zeros(1, 1);
     pb_term = MX.zeros(1, 1);
+    pb_actuator_term = MX.zeros(1, 1);
     
     
     fprintf('\nCollocation loop starting\n')
@@ -704,7 +730,7 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = main(trial_id, trial_
         % current q accelerations
         acc_i = Aj_nsc(:, i);
 
-        [x_all_i, acc_all_i] = apply_constraints(x_i, acc_i, q_names, q_ind_indices);
+        [x_all_i, acc_all_i] = apply_constraints(x_i, acc_i, q_names, q_ind_indices, kinematic_coupling_path);
 
         % evaluate external function
         Ti = F(vertcat(x_all_i, acc_all_i));
@@ -777,9 +803,15 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = main(trial_id, trial_
         pb_term = pb_term + W.pelvis * B(i + 1) * J_pb(pb_torque_j(:, i)) * mesh_T;
         
         
+        % add penalisation term for linear actuator of the punching bag
+        % pb_actuator_term = pb_actuator_term + W.pb_actuator * B(i + 1) * J_pb_lin(a_akj(end-2:end, i + 1)) * mesh_T;
+        
         % ------------ add them up ----------- %
         J = q_term + pelvis_ty_term + q_dot_term + q_dot_dot_term + c_spine_term + ...
             GRF_term + GRM_term + pelvis_term + pb_term;
+        
+        
+        
         % J = q_term + pelvis_ty_term + q_dot_term + q_dot_dot_term + GRF_term + GRM_term + ...
         %     act_term + act_der_term + dMTf_dt_term + c_spine_term + ...
         %     pelvis_term + pb_term;
@@ -829,7 +861,7 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = main(trial_id, trial_
         Ti_moments = Ti(independent_act_indices, 1);
         Ti_moments_scaled = MX.zeros(size(Ti_moments));
         Ti_moments_scaled(1:end-3) = Ti_moments(1:end-3, 1)./joint_moments_sf;
-        Ti_moments_scaled(end-2:end) = Ti_moments(end-2:end, 1)./pb_sf;
+        Ti_moments_scaled(end-2:end) = Ti_moments(end-2:end, 1)./pb_lin_sf;
         eq_constr{end+1} = Ti_moments_scaled - a_akj(:, i + 1);
         
 
@@ -846,7 +878,7 @@ function [opti, w_opt, stats, g_opt, lambda_x, lambda_g] = main(trial_id, trial_
         eq_constr{end+1} = pelvis_res_j(:, i) - pelvis_T;
 
         % ----- punching bag ----- %
-        pb_T = Ti(num_q_all-5:num_q_all-3, 1)./pb_sf;
+        pb_T = Ti(num_q_all-5:num_q_all-3, 1)./pb_rot_sf;
         eq_constr{end+1} = pb_torque_j(:, i) - pb_T;
         
         % loop through the DoFs spanned by the model muscles 

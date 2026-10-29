@@ -48,8 +48,8 @@ def set_x_bounds(Qs: np.ndarray, time_vec: np.ndarray, q_ind_indices: np.ndarray
             guess_index = [i for i, q_name in enumerate(q_names) if q_name == guess_key]
             value = cfg['guess'][guess_key]['bound']
 
-            Qs_lower[guess_index] -= Qs_lower[guess_index] * value
-            Qs_upper[guess_index] += Qs_upper[guess_index] * value
+            Qs_lower[guess_index] -= Qs_lower[guess_index] * value['lower']
+            Qs_upper[guess_index] += Qs_upper[guess_index] * value['upper']
 
 
     # now let's find the coordinates that were zeroed and assign them [-1, 1] bounds

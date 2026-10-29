@@ -1,12 +1,11 @@
 import numpy as np
 from scipy.interpolate import CubicSpline
-from typing import Optional
+from typing import List
 from dataclasses import dataclass
 # local imports
 from ..utils.eval_spline import eval_spline
 
-def set_x_bounds(Qs: np.ndarray, time_vec: np.ndarray, q_ind_indices: np.ndarray[int], num_q: int,
-                 special_q_bounds):
+def set_x_bounds(Qs: np.ndarray, time_vec: np.ndarray, q_ind_indices: np.ndarray[int], q_names: List[str], cfg):
     """
      This function set the bounds to X, which is the vector representing q and q_dot concatenated.
     :param Qs:
@@ -41,6 +40,18 @@ def set_x_bounds(Qs: np.ndarray, time_vec: np.ndarray, q_ind_indices: np.ndarray
     Qs_lower = np.min(pos, axis=0)     # along time
     Qs_upper = np.max(pos, axis=0)     # along time
 
+    # check whether the user has provided any special initial guess which may require to inflate the bounds
+    if cfg['guess']:
+        guess_keys = cfg['guess'].keys()
+
+        for guess_key in guess_keys:
+            guess_index = [i for i, q_name in enumerate(q_names) if q_name == guess_key]
+            value = cfg['guess'][guess_key]['bound']
+
+            Qs_lower[guess_index] -= Qs_lower[guess_index] * value
+            Qs_upper[guess_index] += Qs_lower[guess_index] * value
+
+
     # now let's find the coordinates that were zeroed and assign them [-1, 1] bounds
     zero_indices = np.where((Qs_lower == 0) & (Qs_upper == 0))[0]
     Qs_lower[zero_indices] = -1
@@ -51,17 +62,6 @@ def set_x_bounds(Qs: np.ndarray, time_vec: np.ndarray, q_ind_indices: np.ndarray
     Qs_lower = Qs_lower / scaling.Qs
     Qs_upper = Qs_upper / scaling.Qs
 
-    # check if the user has set some special bounds to be assigned
-    if special_q_bounds:
-        keys = special_q_bounds.keys()
-
-        for key in list(keys):
-            items = special_q_bounds[key]
-            bounds = items["values"]
-            indices = items["indices"]
-
-            Qs_lower[indices] = bounds[0]
-            Qs_upper[indices] = bounds[1]
 
     Qs_lower_ind = Qs_lower[q_ind_indices]
     Qs_upper_ind = Qs_upper[q_ind_indices]

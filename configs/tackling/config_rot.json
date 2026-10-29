@@ -25,6 +25,13 @@
 
         },
 
+    "guess": {
+        "pelvis_ty": {
+          "bound": 0.15,
+          "guess": 0.07
+        }
+    },
+
     "dof_names_spanned_by_muscles": [
         "auxt1jnt_r3", "auxt1jnt_r1", "auxt1jnt_r2",
         "aux2jnt_r3", "aux2jnt_r1", "aux2jnt_r2"
@@ -45,14 +52,14 @@
 
 
     "dll_force_indices": {
-        "rGRF": [1, 2, 3],
+        "rGRF": [],
         "lGRF": [4, 5, 6],
         "rGRM": [37, 38, 39],
         "lGRM": [40, 41, 42]
         },
 
     "experimental_force_indices": {
-        "rGRF": [8, 9, 10],
+        "rGRF": [],
         "lGRF": [2, 3, 4],
         "rGRM": [11, 12, 13],
         "lGRM": [5, 6, 7]

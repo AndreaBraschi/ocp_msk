@@ -1,12 +1,12 @@
 import numpy as np
 from scipy.interpolate import CubicSpline
-from typing import Dict
+from typing import Dict, List
 
 # internal imports
 from ..utils.eval_spline_col import *
 
 def generate_x_guess(Qs: np.ndarray, q_ind_indices: np.ndarray[int], time_experimental: np.ndarray,
-                     time_mesh: np.ndarray, time_col: np.ndarray, num_q: int, scaling) -> Dict[str, np.ndarray]:
+                     time_mesh: np.ndarray, time_col: np.ndarray, scaling, q_names: List[str], cfg) -> Dict[str, np.ndarray]:
 
     """
     This function sets the initial guess for X (q's and q_dot's interleaved) from the experimental data.
@@ -29,6 +29,16 @@ def generate_x_guess(Qs: np.ndarray, q_ind_indices: np.ndarray[int], time_experi
     :param scaling: scaling factor of the model's generalised coordinates
     :return:
     """
+
+    # check whether the user has provided any special initial guess which may require to inflate the bounds
+    if cfg['guess']:
+        guess_keys = cfg['guess'].keys()
+
+        for guess_key in guess_keys:
+            guess_index = [i for i, q_name in enumerate(q_names) if q_name == guess_key]
+            value = cfg['guess'][guess_key]['guess']
+
+            Qs[:, guess_index] += value
 
     # initialise the 'guess' object as a Dict
     guess: Dict[str, np.ndarray] = {}

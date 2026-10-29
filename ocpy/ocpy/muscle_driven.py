@@ -242,7 +242,7 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
     # -------------------------------------- Bounds ------------------------------------------------------- #
     # ----------- X ----------- #
     special_q_bounds = cfg["bounds"]["special_qs"]
-    x_bounds, x_scaling = set_x_bounds(Qs, time_raw, q_ind_indices, num_q_all, special_q_bounds)
+    x_bounds, x_scaling = set_x_bounds(Qs, time_raw, q_ind_indices, q_names, cfg)
 
     scaling_filepath = os.path.join(output_dir, "scaling.pkl")
     with open(scaling_filepath, "wb") as f:
@@ -259,7 +259,7 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
     muscle_bounds, muscle_scaling = set_muscle_bounds(num_muscles)
 
     # -------------------------------------- Initial Guess ------------------------------------------------------- #
-    x_guess = generate_x_guess(Qs, q_ind_indices, time_raw, time_mesh, time_col, num_q_all, x_scaling)
+    x_guess = generate_x_guess(Qs, q_ind_indices, time_raw, time_mesh, time_col, x_scaling, q_names, cfg)
     torque_guess = generate_torque_guess(num_actuators, time_mesh, time_col)
     muscle_guess = generate_muscle_guess(num_muscles, time_mesh, time_col, muscle_scaling)
 

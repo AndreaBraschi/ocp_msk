@@ -9,8 +9,8 @@
         "q": 110,
         "q_special": 25,
         "q_dot": 25,
-        "acc": 0.001,
         "q_no_tracking": 0.001,
+        "acc": 0.001,
         "GRF": 50,
         "GRM": 0,
         "a": 5,
@@ -20,15 +20,18 @@
     },
 
      "tracking": {
-        "no_tracking": [],
+        "no_tracking": ["mtp_angle_l"],
          "special_tracking": ["pelvis_ty"]
 
         },
 
     "guess": {
         "pelvis_ty": {
-          "bound": 0.15,
-          "guess": 0.07
+          "bound": {
+            "lower": -0.25,
+            "upper": 0.05
+          },
+          "guess": 0.02
         }
     },
 
@@ -86,21 +89,26 @@
                 },
 
              "pb_rot": {
-                 "magnitude": 25,
-                 "names": ["global_rotZ", "global_rotX", "global_rotY"]
+                 "magnitude": 10,
+                 "names": ["global_rotX", "global_rotZ"]
              }
         },
 
 
         "special": {
             "pb_y": {
-                "magnitude": 600,
+                "magnitude": 510,
                 "names": ["global_ty"]
             },
 
             "pb_xz": {
-                "magnitude": 40,
+                "magnitude": 20,
                 "names": ["global_tx", "global_tz"]
+            },
+
+            "pb_rotY": {
+                "magnitude": 300,
+                "names": ["global_rotY"]
             }
         },
 
@@ -111,9 +119,29 @@
         "residuals": {
             "pelvis_linear": [200, 3],
             "pelvis_rotational": [50, 3],
-            "pb_rot": [25, 3]
+            "pb_rot": [25, 2]
         },
-        "special_qs": []
+        "special_qs": {
+
+          "mtp_angle_l": {
+            "q": {
+              "lower": -1.0,
+              "upper": 1.0,
+              "scale": 1.0471975499999999
+            },
+            "q_dot": {
+              "lower": -1.0,
+              "upper": 1.0,
+              "scale": 6.5
+            },
+            "acc": {
+              "lower": -1.0,
+              "upper": 1.0,
+              "scale": 400
+            }
+          }
+
+        }
     },
 
     "params": {

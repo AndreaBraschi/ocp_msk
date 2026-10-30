@@ -62,6 +62,15 @@ def set_x_bounds(Qs: np.ndarray, time_vec: np.ndarray, q_ind_indices: np.ndarray
     Qs_lower = Qs_lower / scaling.Qs
     Qs_upper = Qs_upper / scaling.Qs
 
+    # check whether the user has provided any special initial guess which may require to inflate the bounds
+    if cfg['bounds']['special_qs']:
+        bounds_keys = cfg['bounds']['special_qs'].keys()
+
+        for bound_key in bounds_keys:
+            bound_index = [i for i, q_name in enumerate(q_names) if q_name == bound_key]
+            Qs_lower[bound_index] = cfg['bounds']['special_qs'][bound_key]['q']['lower']
+            Qs_upper[bound_index] = cfg['bounds']['special_qs'][bound_key]['q']['upper']
+            scaling.Qs[bound_index] = cfg['bounds']['special_qs'][bound_key]['q']['scale']
 
     Qs_lower_ind = Qs_lower[q_ind_indices]
     Qs_upper_ind = Qs_upper[q_ind_indices]
@@ -80,6 +89,15 @@ def set_x_bounds(Qs: np.ndarray, time_vec: np.ndarray, q_ind_indices: np.ndarray
     Qsdot_lower = Qsdot_lower / scaling.Qsdot
     Qsdot_upper = Qsdot_upper / scaling.Qsdot
 
+    if cfg['bounds']['special_qs']:
+        bounds_keys = cfg['bounds']['special_qs'].keys()
+
+        for bound_key in bounds_keys:
+            bound_index = [i for i, q_name in enumerate(q_names) if q_name == bound_key]
+            Qsdot_lower[bound_index] = cfg['bounds']['special_qs'][bound_key]['q_dot']['lower']
+            Qsdot_upper[bound_index] = cfg['bounds']['special_qs'][bound_key]['q_dot']['upper']
+            scaling.Qsdot[bound_index] = cfg['bounds']['special_qs'][bound_key]['q_dot']['scale']
+
     Qsdot_lower_ind = Qsdot_lower[q_ind_indices]
     Qsdot_upper_ind = Qsdot_upper[q_ind_indices]
 
@@ -96,6 +114,15 @@ def set_x_bounds(Qs: np.ndarray, time_vec: np.ndarray, q_ind_indices: np.ndarray
     scaling.Qsdotdot = np.maximum(np.abs(Qsdotdot_lower), np.abs(Qsdotdot_upper))
     Qsdotdot_lower = Qsdotdot_lower / scaling.Qsdotdot
     Qsdotdot_upper = Qsdotdot_upper / scaling.Qsdotdot
+
+    if cfg['bounds']['special_qs']:
+        bounds_keys = cfg['bounds']['special_qs'].keys()
+
+        for bound_key in bounds_keys:
+            bound_index = [i for i, q_name in enumerate(q_names) if q_name == bound_key]
+            Qsdotdot_lower[bound_index] = cfg['bounds']['special_qs'][bound_key]['acc']['lower']
+            Qsdotdot_upper[bound_index] = cfg['bounds']['special_qs'][bound_key]['acc']['upper']
+            scaling.Qsdotdot[bound_index] = cfg['bounds']['special_qs'][bound_key]['acc']['scale']
 
     q_bounds.Qsdotdot_lower_ind = Qsdotdot_lower[q_ind_indices]
     q_bounds.Qsdotdot_upper_ind = Qsdotdot_upper[q_ind_indices]

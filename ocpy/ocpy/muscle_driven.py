@@ -216,7 +216,7 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
     # we define one actuator per independent DoF here we check which coordinates the user has indicated as where to
     # assign the residual forces. We need to make sure that we correctly separate the residual forces from the actuator
     # forces/torques so that we can assign them to the correct set of constraints.
-    exclude = set(res_indices) | set(no_tracking_indices) | set(dof_no_act_indices)
+    exclude = set(res_indices) | set(dof_no_act_indices)
     actuator_indices = [i for i in q_ind_indices if i not in exclude]
     actuator_names = [name for i, name in enumerate(q_names) if i in actuator_indices]
     num_actuators = len(actuator_indices)
@@ -241,7 +241,6 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
 
     # -------------------------------------- Bounds ------------------------------------------------------- #
     # ----------- X ----------- #
-    special_q_bounds = cfg["bounds"]["special_qs"]
     x_bounds, x_scaling = set_x_bounds(Qs, time_raw, q_ind_indices, q_names, cfg)
 
     scaling_filepath = os.path.join(output_dir, "scaling.pkl")
@@ -294,12 +293,49 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
     # 1) collocation points
     dims_x  = 2 * num_q_ind
     X_col = opti.variable(dims_x, N * d)
-    opti.subject_to(x_bounds.X_lower <= (X_col <= x_bounds.X_upper))
+    X_lower = x_bounds.X_lower[:, None] * np.ones((dims_x, N * d))
+    X_upper = x_bounds.X_upper[:, None] * np.ones((dims_x, N * d))
+
+    if cfg['bounds']['x_t']:
+        bound_keys = cfg['bounds']['x_t'].keys()
+
+        for bound_key in bound_keys:
+            bound_index = [i for i, q_name in enumerate(q_ind_names) if q_name == bound_key]
+            frames = cfg['bounds']['x_t'][bound_key]['frames']
+
+            q_guess = x_guess["x_col_ind"][:, ::2][:, bound_index][frames]
+            X_lower[::2][[bound_index], frames] = (q_guess + (cfg['bounds']['x_t'][bound_key]['lower_pos'] / x_scaling.Qs[q_ind_indices][bound_index])).T
+            X_upper[::2][[bound_index], frames] = (q_guess + (cfg['bounds']['x_t'][bound_key]['upper_pos'] / x_scaling.Qs[q_ind_indices][bound_index])).T
+
+            qdot_guess = x_guess["x_col_ind"][:, 1::2][:, bound_index][frames]
+            X_lower[1::2][[bound_index], frames] = (qdot_guess + (cfg['bounds']['x_t'][bound_key]['lower_vel'] / x_scaling.Qsdot[q_ind_indices][bound_index])).T
+            X_upper[1::2][[bound_index], frames] = (qdot_guess + (cfg['bounds']['x_t'][bound_key]['upper_vel'] / x_scaling.Qsdot[q_ind_indices][bound_index])).T
+
+    opti.subject_to(X_lower <= (X_col <= X_upper))
     opti.set_initial(X_col, x_guess["x_col_ind"].T)
 
     # 2) mesh end-points
     X = opti.variable(dims_x, N + 1)
-    opti.subject_to(x_bounds.X_lower <= (X <= x_bounds.X_upper))
+
+    X_lower = x_bounds.X_lower[:, None] * np.ones((dims_x, N + 1))
+    X_upper = x_bounds.X_upper[:, None] * np.ones((dims_x, N + 1))
+    if cfg['bounds']['x_t']:
+        bound_keys = cfg['bounds']['x_t'].keys()
+
+        for bound_key in bound_keys:
+            bound_index = [i for i, q_name in enumerate(q_ind_names) if q_name == bound_key]
+            frames = cfg['bounds']['x_t'][bound_key]['frames']
+
+            q_guess = x_guess["x_col_ind"][:, ::2][:, bound_index][frames]
+            X_lower[::2][[bound_index], frames] = (q_guess + (cfg['bounds']['x_t'][bound_key]['lower_pos'] / x_scaling.Qs[bound_index])).T
+            X_upper[::2][[bound_index], frames] = (q_guess + (cfg['bounds']['x_t'][bound_key]['upper_pos'] / x_scaling.Qs[bound_index])).T
+
+            qdot_guess = x_guess["x_col_ind"][:, 1::2][:, bound_index][frames]
+            X_lower[1::2][[bound_index], frames] = (qdot_guess + (cfg['bounds']['x_t'][bound_key]['lower_vel'] / x_scaling.Qsdot[bound_index])).T
+            X_upper[1::2][[bound_index], frames] = (qdot_guess + (cfg['bounds']['x_t'][bound_key]['upper_vel'] / x_scaling.Qsdot[bound_index])).T
+
+
+    opti.subject_to(X_lower <= (X <= X_upper))
     opti.set_initial(X, x_guess["x_end_ind"].T)
 
     # Muscle activation
@@ -964,11 +1000,11 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
 
 if __name__ == "__main__":
     subject_id = "P10"
-    trial_id = "R0001"
+    trial_id = "L0002"
     trial = f"{subject_id}{trial_id}"
-    model_path = fr"C:\Users\ab3758\Documents\PhD\msk\{subject_id}\scaled_model_rot.osim"
-    ik_path = fr"C:\Users\ab3758\Documents\PhD\msk\{subject_id}\ik\{trial}\{trial}_ik.mot"
-    dll_path = fr'C:\Users\ab3758\Documents\projects\ocp_msk\dlls\{subject_id}\build\RelWithDebInfo\{subject_id}_r.dll'
+    model_path = fr"C:\Users\ab3758\Documents\PhD\msk\{subject_id}\scaled_model_pb_mtp.osim"
+    ik_path = fr"C:\Users\ab3758\Documents\PhD\msk\{subject_id}\ik\{trial}\{trial}_ik_mtp.mot"
+    dll_path = fr'C:\Users\ab3758\Documents\projects\ocp_msk\dlls\{subject_id}\build\RelWithDebInfo\{subject_id}_l_opt.dll'
     config_filepath = r"C:\Users\ab3758\Documents\projects\ocp_msk\configs\tackling\config_rot.json"
     kinematic_coupling_path = r"C:\Users\ab3758\Documents\projects\ocp_msk\configs\tackling\kinematic_coupling_config.json"
 

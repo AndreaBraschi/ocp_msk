@@ -20,7 +20,7 @@
     },
 
      "tracking": {
-        "no_tracking": ["mtp_angle_l"],
+        "no_tracking": ["mtp_angle_r","mtp_angle_l"],
          "special_tracking": ["pelvis_ty"]
 
         },
@@ -140,8 +140,26 @@
               "scale": 400
             }
           }
+        },
 
+      "x_t": {
+        "global_tx": {
+          "frames": [0, -1],
+          "lower_pos": -1.0,
+          "upper_pos": 1.0,
+          "lower_vel": -0.5,
+          "upper_vel": 0.5
+        },
+
+        "global_tz": {
+          "frames": [0, -1],
+          "lower_pos": -1.0,
+          "upper_pos": 1.0,
+          "lower_vel": -0.5,
+          "upper_vel": 0.5
         }
+      }
+
     },
 
     "params": {

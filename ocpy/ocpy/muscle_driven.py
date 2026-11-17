@@ -79,6 +79,7 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
 
         # find global indices of the coordinates that are to be tracked
         q_tracking_indices = [i for i in q_ind_indices if i not in no_tracking_indices]
+        q_tracking_names = [name for name in q_ind_names if name not in no_tracking_names]
 
         # now, this can be a little confusing at this point of the code. However, normally we only track the independent
         # coordinates from experimental data. The independent coordinate set represents a subset of indices. In this
@@ -91,6 +92,7 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
         local_ind_indices = range(num_q_ind)
         tracking_indices_l = local_ind_indices
         q_tracking_indices = q_ind_indices
+        q_tracking_names = q_names
 
     num_q_tracking = len(q_tracking_indices)
     tracking_indices = range(num_q_tracking)
@@ -104,10 +106,11 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
         # now, we do the same thing as before: we must express the indices also in the "local" subset.
         # let's find the indices of the special DoFs within the set of independent DoFs
         special_q_indices_l = [i for i, name in enumerate(q_ind_names) if name in special_tracking_names]
+        special_q_indices_g = [i for i, name in enumerate(q_tracking_names) if name in special_tracking_names]
 
         # then we need a list of indices that will allow us to extract the coordinates that will be assigned a global
         # tracking weight
-        indices_to_track = [i for i in tracking_indices if i not in special_q_indices_l]
+        indices_to_track = [i for i in tracking_indices if i not in special_q_indices_g]
 
     else:
         indices_to_track = tracking_indices
@@ -722,7 +725,7 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
         q_i = Xkj[::2, i + 1]
 
         if special_tracking_names:
-            q_special_diff = q_i[special_q_indices_l] - q_track_kj[special_q_indices_l, i + 1]
+            q_special_diff = q_i[special_q_indices_l] - q_track_kj[special_q_indices_g, i + 1]
             q_special_term =  q_special_term + W["q_special"] * B[i + 1] * J_special(q_special_diff) * mesh_T
 
         q_new_indices = [i for i in tracking_indices_l if i not in special_q_indices_l]
@@ -1014,7 +1017,7 @@ if __name__ == "__main__":
     output_dir = fr"C:\Users\ab3758\Documents\projects\tackling\msk_modelling\ocp\outputs\{subject_id}\{trial_id}"
     grf_path = fr"C:\Users\ab3758\Documents\PhD\msk\{subject_id}\grf\{trial}.mot"
 
-    muscle_info_path = r"C:\Users\ab3758\Documents\projects\ocp_msk\assets\P09\muscle_info_reduced.pkl"
+    muscle_info_path = r"C:\Users\ab3758\Documents\projects\ocp_msk\assets\P05\muscle_info_reduced.pkl"
 
     w_opt, stats, g_opt, lambda_g, lambda_x = run(model_path, ik_path, dll_path, config_filepath, kinematic_coupling_path,output_dir, muscle_info_path,
                   grf_path)

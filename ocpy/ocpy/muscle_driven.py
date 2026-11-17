@@ -170,8 +170,6 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
     time_col[1::d] = time_mesh[:-1] + tau_root[2] * mesh_T     # 2nd collocation point of every mesh
     time_col[2::d] = time_mesh[:-1] + tau_root[3] * mesh_T     # 3rd collocation point of every mesh
 
-
-
     # ------------ Ground Reaction Forces (if any) ----------- #
     if grf_path:
         grf_init = np.where((GRFs_raw['time'] < (time_raw[0] + dt_GRF / 2)) & (GRFs_raw['time'] >= (time_raw[0] - dt_GRF / 2)))[0][0]
@@ -245,8 +243,8 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
 
     scaling_filepath = os.path.join(output_dir, "scaling.pkl")
     with open(scaling_filepath, "wb") as f:
-        pickle.dump(dict(q_scaling=x_scaling.Qs, qdot_scaling=x_scaling.Qsdot, acc_scaling=x_scaling.Qsdotdot),
-                     f, protocol=4)
+        pickle.dump(dict(q_scaling=x_scaling.Qs, qdot_scaling=x_scaling.Qsdot, acc_scaling=x_scaling.Qsdotdot,
+                         time_col=time_col, time_mesh=time_mesh), f, protocol=4)
 
     # ----------- torque actuators ----------- #
     torque_bounds, torque_scaling = set_torque_bounds(num_actuators)
@@ -454,16 +452,21 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
         for key in list(param_keys):
 
             param_size: int = cfg['params'][key]['size']
-            param_guess = cfg['params'][key]['guess'] / param_scaling[key]
-            
-            param_dict[key] = opti.variable(param_size, 1)
-            opti.subject_to(param_bounds[key]['lower'] <= (param_dict[key] <= param_bounds[key]['upper']))
-            
-            opti.set_initial(param_dict[key], param_guess * np.ones((param_size, 1)))
+
+            if cfg['params'][key]['mode'] == 'opt':
+                param_guess = cfg['params'][key]['guess'] / param_scaling[key]
+
+                param_dict[key] = opti.variable(param_size, 1)
+                opti.subject_to(param_bounds[key]['lower'] <= (param_dict[key] <= param_bounds[key]['upper']))
+
+                opti.set_initial(param_dict[key], param_guess * np.ones((param_size, 1)))
+
+            elif cfg['params'][key]['mode'] == 'prescribe':
+                param_dict[key] = ca.MX(cfg['params'][key]['value'] * np.ones((param_size, 1)) / param_scaling[key])
+                print(f"Setting {key} to prescribed value: {cfg['params'][key]['value']}")
 
             func_map_in.append(param_dict[key])
-    
-    
+
     print(f"Decision variables: {opti.nx}")
     print(f"Bound constraints : {opti.ng}")
 
@@ -578,6 +581,9 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
         
         for n_p, key in enumerate(list(param_keys)):
             params_nsc[n_p, :] = param_sym[key] * param_scaling[key]
+
+    print(params_nsc)
+    x = stop
 
     # ---------------------- CasADi functions -------------------------- #
     # Cost-function: sum of squares
@@ -999,11 +1005,11 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
     return w_opt, stats, g_opt, lambda_g, lambda_x
 
 if __name__ == "__main__":
-    subject_id = "P10"
-    trial_id = "L0002"
+    subject_id = "P09"
+    trial_id = "L4502"
     trial = f"{subject_id}{trial_id}"
     model_path = fr"C:\Users\ab3758\Documents\PhD\msk\{subject_id}\scaled_model_pb_mtp.osim"
-    ik_path = fr"C:\Users\ab3758\Documents\PhD\msk\{subject_id}\ik\{trial}\{trial}_ik_mtp.mot"
+    ik_path = fr"C:\Users\ab3758\Documents\PhD\msk\{subject_id}\ik\{trial}\{trial}_ik_marker.mot"
     dll_path = fr'C:\Users\ab3758\Documents\projects\ocp_msk\dlls\{subject_id}\build\RelWithDebInfo\{subject_id}_l_opt.dll'
     config_filepath = r"C:\Users\ab3758\Documents\projects\ocp_msk\configs\tackling\config_rot.json"
     kinematic_coupling_path = r"C:\Users\ab3758\Documents\projects\ocp_msk\configs\tackling\kinematic_coupling_config.json"

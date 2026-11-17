@@ -164,15 +164,19 @@
 
     "params": {
         "k": {
-            "guess": 1e5,
-            "bounds": [3e4, 3e5],
-            "size": 1
+          "mode": "prescribe",
+          "guess": 1e5,
+          "bounds": [3e4, 3e5],
+          "value": 8e4,
+          "size": 1
         },
 
         "c": {
-            "guess": 1.0,
-            "bounds": [0.2, 1.8],
-            "size": 1
+          "mode": "prescribe",
+          "guess": 1.0,
+          "bounds": [0.2, 1.8],
+          "value": 0.4,
+          "size": 1
         }
     },
 

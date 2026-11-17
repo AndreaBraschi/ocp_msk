@@ -241,7 +241,7 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
     # ----------- X ----------- #
     x_bounds, x_scaling = set_x_bounds(Qs, time_raw, q_ind_indices, q_names, cfg)
 
-    scaling_filepath = os.path.join(output_dir, "scaling.pkl")
+    scaling_filepath = os.path.join(output_dir, f"{cfg['solution']['scaling_filename']}.pkl")
     with open(scaling_filepath, "wb") as f:
         pickle.dump(dict(q_scaling=x_scaling.Qs, qdot_scaling=x_scaling.Qsdot, acc_scaling=x_scaling.Qsdotdot,
                          time_col=time_col, time_mesh=time_mesh), f, protocol=4)
@@ -581,9 +581,6 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
         
         for n_p, key in enumerate(list(param_keys)):
             params_nsc[n_p, :] = param_sym[key] * param_scaling[key]
-
-    print(params_nsc)
-    x = stop
 
     # ---------------------- CasADi functions -------------------------- #
     # Cost-function: sum of squares
@@ -997,7 +994,7 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
     # Solve problem
     w_opt, stats, g_opt, lambda_g, lambda_x = solve_NLP(opti, options)
 
-    output_filepath = os.path.join(output_dir, "muscle_solution.pkl")
+    output_filepath = os.path.join(output_dir, f"{cfg['solution']['scaling_filename']}.pkl")
     with open(output_filepath, "wb") as f:
         pickle.dump(dict(w_opt=w_opt, stats=stats, g_opt=g_opt,
                          lambda_x=lambda_x, lambda_g=lambda_g), f, protocol=4)
@@ -1017,7 +1014,7 @@ if __name__ == "__main__":
     output_dir = fr"C:\Users\ab3758\Documents\projects\tackling\msk_modelling\ocp\outputs\{subject_id}\{trial_id}"
     grf_path = fr"C:\Users\ab3758\Documents\PhD\msk\{subject_id}\grf\{trial}.mot"
 
-    muscle_info_path = r"C:\Users\ab3758\Documents\projects\ocp_msk\assets\P05\muscle_info_reduced.pkl"
+    muscle_info_path = r"C:\Users\ab3758\Documents\projects\ocp_msk\assets\P09\muscle_info_reduced.pkl"
 
     w_opt, stats, g_opt, lambda_g, lambda_x = run(model_path, ik_path, dll_path, config_filepath, kinematic_coupling_path,output_dir, muscle_info_path,
                   grf_path)

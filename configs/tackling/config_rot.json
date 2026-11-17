@@ -182,8 +182,13 @@
 
     "optimiser": {
       "tolerance": 3,
-      "max_iters": 5000,
-      "num_threads": 16
+      "max_iters": 1,
+      "num_threads": 8
 
+    },
+
+    "solution": {
+      "scaling_filename": "scaling_test",
+      "solution_filename": "muscle_solution_tes"
     }
 }

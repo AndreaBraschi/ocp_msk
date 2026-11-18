@@ -997,7 +997,7 @@ def run(model_path: str, ik_path: str, external_func_path: str, config_filepath:
     # Solve problem
     w_opt, stats, g_opt, lambda_g, lambda_x = solve_NLP(opti, options)
 
-    output_filepath = os.path.join(output_dir, f"{cfg['solution']['scaling_filename']}.pkl")
+    output_filepath = os.path.join(output_dir, f"{cfg['solution']['solution_filename']}.pkl")
     with open(output_filepath, "wb") as f:
         pickle.dump(dict(w_opt=w_opt, stats=stats, g_opt=g_opt,
                          lambda_x=lambda_x, lambda_g=lambda_g), f, protocol=4)
